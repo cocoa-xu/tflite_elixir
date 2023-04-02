@@ -122,7 +122,7 @@ jobs:
           export TFLITE_BEAM_PREFER_PRECOMPILED=false
 
           mix deps.get 1>/dev/null 2>&1
-          cp -a ../tflite_beam/notebooks                        ./priv/tflite_examples
+          cp -a ../tflite_elixir/notebooks                        ./priv/tflite_examples
           sed -i 's/"welcome.livemd"\,/"welcome.livemd"\, "tflite_examples",/g' lib/nerves_livebook/application.ex
 
           mix firmware
