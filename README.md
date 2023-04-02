@@ -2,6 +2,8 @@
 
 TensorFlow Lite Elixir bindings with optional EdgeTPU support.
 
+For pure Erlang bindings, please see [cocoa-xu/tflite_beam](https://github.com/cocoa-xu/tflite_beam).
+
 ## Try it in Livebook
 A general workflow looks like this,
 
