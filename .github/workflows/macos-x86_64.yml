@@ -4,23 +4,17 @@ on:
   pull_request:
     paths-ignore:
       - '**/*.md'
-      - 'examples/**/*.livemd'
-      - 'examples/*.livemd'
+      - '**/*.livemd'
   push:
     branches:
       - main
-      - test-*
-      - macos-ci-*
     paths-ignore:
       - '**/*.md'
-      - 'examples/**/*.livemd'
-      - 'examples/*.livemd'
-      - 'nerves/**'
+      - '**/*.livemd'
       - '.github/FUNDING.yml'
       - '.github/workflows/nerves-*'
-      - '.github/workflows/linux-*.yml'
-      - '.github/workflows/macos-precompiled.yml'
-      - '.github/workflows/test-*.yml'
+      - '.github/workflows/linux-*'
+      - '.github/workflows/test-*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
