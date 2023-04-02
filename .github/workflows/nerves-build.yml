@@ -119,7 +119,10 @@ jobs:
 
           export MIX_TARGET=${{ matrix.pair.target }}
           export TFLITE_BEAM_CORAL_LIBEDGETPU_LIBRARIES=${{ matrix.pair.libedgetpu_library }}
-          export TFLITE_BEAM_PREFER_PRECOMPILED=false
+          export TFLITE_BEAM_PREFER_PRECOMPILED=true
+          if [ "${TFLITE_BEAM_CORAL_LIBEDGETPU_LIBRARIES}" = "armv6" ]; then
+            export TFLITE_BEAM_PREFER_PRECOMPILED=false
+          fi
 
           mix deps.get 1>/dev/null 2>&1
           cp -a ../tflite_elixir/notebooks                        ./priv/tflite_examples
