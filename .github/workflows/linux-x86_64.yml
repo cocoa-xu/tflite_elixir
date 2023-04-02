@@ -1,0 +1,50 @@
+name: linux-x86_64
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.livemd'
+  push:
+    branches:
+      - main
+      - feature-*
+      - experimental-*
+      - test-*
+      - fix-*
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.livemd'
+      - '.github/FUNDING.yml'
+      - '.github/workflows/nerves-*'
+      - '.github/workflows/macos-*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mix_test:
+    runs-on: ubuntu-20.04
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TFLITE_BEAM_CORAL_SUPPORT: "true"
+      TFLITE_BEAM_PREFER_PRECOMPILED: "false"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "25.3"
+          elixir-version: "1.14"
+
+      - name: Install system dependecies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git libssl-dev libncurses5-dev ca-certificates
+
+      - name: Compile and Test
+        run: |
+          mix deps.get
+          mix test

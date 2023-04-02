@@ -1,0 +1,50 @@
+name: macos-x86_64
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'examples/**/*.livemd'
+      - 'examples/*.livemd'
+  push:
+    branches:
+      - main
+      - test-*
+      - macos-ci-*
+    paths-ignore:
+      - '**/*.md'
+      - 'examples/**/*.livemd'
+      - 'examples/*.livemd'
+      - 'nerves/**'
+      - '.github/FUNDING.yml'
+      - '.github/workflows/nerves-*'
+      - '.github/workflows/linux-*.yml'
+      - '.github/workflows/macos-precompiled.yml'
+      - '.github/workflows/test-*.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mix_test:
+    runs-on: macos-11
+    env:
+      TFLITE_BEAM_CORAL_SUPPORT: "true"
+      TFLITE_BEAM_PREFER_PRECOMPILED: "true"
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Erlang and Elixir
+        run: |
+          brew install erlang
+          brew install elixir
+          mix local.hex --force
+          mix local.rebar --force
+          brew install autoconf automake
+
+      - name: Compile and Test
+        run: |
+          mix deps.get
+          mix test
