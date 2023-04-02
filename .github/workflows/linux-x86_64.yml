@@ -29,7 +29,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TFLITE_BEAM_CORAL_SUPPORT: "true"
-      TFLITE_BEAM_PREFER_PRECOMPILED: "false"
+      TFLITE_BEAM_PREFER_PRECOMPILED: "true"
 
     steps:
       - uses: actions/checkout@v3
