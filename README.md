@@ -2,15 +2,6 @@
 
 TensorFlow Lite Elixir bindings with optional EdgeTPU support.
 
-| OS               | Arch    | ABI       | Build Status | Has Precompiled Library |
-|------------------|---------|-----------|--------------|-------------------------|
-| Ubuntu 20.04     | x86_64  | gnu       | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-x86_64.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-x86_64.yml) | Yes |
-| Ubuntu 20.04     | arm64   | gnu       | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml) | Yes |
-| Ubuntu 20.04     | armv7l  | gnueabihf | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml) | Yes |
-| Ubuntu 20.04     | riscv64 | gnu       | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/linux-precompile.yml) | Yes |
-| macOS 11 Big Sur | x86_64  | darwin    | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/macos-x86_64.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/macos-x86_64.yml) | Yes |
-| macOS 11 Big Sur | arm64   | darwin    | [![CI](https://github.com/cocoa-xu/tflite_beam/actions/workflows/macos-precompile.yml/badge.svg)](https://github.com/cocoa-xu/tflite_beam/actions/workflows/macos-precompile.yml) | Yes |
-
 ## Try it in Livebook
 A general workflow looks like this,
 
@@ -34,7 +25,7 @@ nx_tensor =
 
 # get top k predictions (numerical id of the class)
 # classes can be found in this file,
-# https://raw.githubusercontent.com/cocoa-xu/tflite_beam/main/test/test_data/inat_bird_labels.txt
+# https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/inat_bird_labels.txt
 # each line corresponds to a class
 # and the first line = id 0
 top_k = 5
@@ -74,9 +65,9 @@ iex> ImageClassification.predict(pid, "test/test_data/parrot.jpeg", top_k: 3)
 
 ### Prebuilt firmware (Experimental)
 
-[![Nerves](https://github-actions.40ants.com/cocoa-xu/tflite_beam/matrix.svg?only=nerves-build)](https://github.com/cocoa-xu/tflite_beam)
+[![Nerves](https://github-actions.40ants.com/cocoa-xu/tflite_elixir/matrix.svg?only=nerves-build)](https://github.com/cocoa-xu/tflite_elixir)
 
-Prebuilt firmwares are available [here](https://github.com/cocoa-xu/tflite_beam/actions/workflows/nerves-build.yml?query=is%3Asuccess).
+Prebuilt firmwares are available [here](https://github.com/cocoa-xu/tflite_elixir/actions/workflows/nerves-build.yml?query=is%3Asuccess).
 
 Select the most recent run and scroll down to the `Artifacts` section, download the firmware file for your board and run
 
@@ -84,7 +75,7 @@ Select the most recent run and scroll down to the `Artifacts` section, download 
 fwup /path/to/the/downloaded/firmware.fw
 ```
 
-In the nerves build, `tflite_beam` is integrated as one of the dependencies of the [nerves_livebook](https://github.com/livebook-dev/nerves_livebook) project. This means that you can use livebook (as well as other pre-pulled libraries) to explore and evaluate the `tflite_beam` project.
+In the nerves build, `tflite_elixir` is integrated as one of the dependencies of the [nerves_livebook](https://github.com/livebook-dev/nerves_livebook) project. This means that you can use livebook (as well as other pre-pulled libraries) to explore and evaluate the `tflite_elixir` project.
 
 The default password of the livebook is `nerves` (as the time of writing, if it does not work, please check the nerves_livebook project).
 
@@ -107,17 +98,18 @@ export MIX_TARGET=rpi4
 # Possible values including
 # - aarch64
 # - armv7l
+# - armv6
 # - riscv64
 # - x86_64
-export TFLITE_ELIXIR_CORAL_LIBEDGETPU_LIBRARIES=aarch64
+export TFLITE_BEAM_CORAL_LIBEDGETPU_LIBRARIES=aarch64
 ```
 
 2. If prefer not to use precompiled binaries
 ```shell
 # for example
 export MIX_TARGET=rpi4
-# then set env var TFLITE_ELIXIR_PREFER_PRECOMPILED to NO
-export TFLITE_ELIXIR_PREFER_PRECOMPILED=NO
+# then set env var TFLITE_BEAM_PREFER_PRECOMPILED to false
+export TFLITE_BEAM_PREFER_PRECOMPILED=false
 ```
 
 ## Demo
@@ -247,31 +239,31 @@ For some Linux OSes you need to manually execute the following command to update
 
 ```shell
 mix deps.get
-bash "3rd_party/cache/${TFLITE_ELIXIR_CORAL_LIBEDGETPU_RUNTIME}/edgetpu_runtime/install.sh"
+bash "3rd_party/cache/${TFLITE_BEAM_CORAL_LIBEDGETPU_RUNTIME}/edgetpu_runtime/install.sh"
 ```
 
 ### Compile-Time Environment Variable
-- `TFLITE_ELIXIR_PREFER_PRECOMPILED`
+- `TFLITE_BEAM_PREFER_PRECOMPILED`
 
-  Use precompiled binaries when `TFLITE_ELIXIR_PREFER_PRECOMPILED` is `YES`. Otherwise, this library will compile from source.
+  Use precompiled binaries when `TFLITE_BEAM_PREFER_PRECOMPILED` is `true`. Otherwise, this library will compile from source.
 
-  Defaults to `YES`.
+  Defaults to `true`.
 
-- `TFLITE_ELIXIR_CORAL_SUPPORT`
+- `TFLITE_BEAM_CORAL_SUPPORT`
 
   Enable Coral Support.
 
-  Defaults to `YES`.
+  Defaults to `true`.
 
-- `TFLITE_ELIXIR_CORAL_USB_THROTTLE`
+- `TFLITE_BEAM_CORAL_USB_THROTTLE`
 
   Throttling USB Coral Devices. Please see the official warning here, [google-coral/libedgetpu](https://github.com/google-coral/libedgetpu#warning).
 
-  Defaults to `YES`.
+  Defaults to `true`.
 
-  Note that only when `TFLITE_ELIXIR_CORAL_USB_THROTTLE` is set to `NO`, `:tflite_beam` will use the non-throttled libedgetpu libraries.
+  Note that only when `TFLITE_BEAM_CORAL_USB_THROTTLE` is set to `false`, `:tflite_beam` will use the non-throttled libedgetpu libraries.
 
-- `TFLITE_ELIXIR_CORAL_LIBEDGETPU_LIBRARIES`
+- `TFLITE_BEAM_CORAL_LIBEDGETPU_LIBRARIES`
 
   Choose which ones of the libedgetpu libraries to copy to the `priv` directory of the `:tflite_beam` app.
 
@@ -296,17 +288,17 @@ bash "3rd_party/cache/${TFLITE_ELIXIR_CORAL_LIBEDGETPU_RUNTIME}/edgetpu_runtime/
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `tflite_beam` to your list of dependencies in `mix.exs`:
+by adding `tflite_elixir` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:tflite_beam, "~> 0.1"}
+    {:tflite_elixir, "~> 0.3.0"}
   ]
 end
 ```
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/tflite_beam>.
+be found at <https://hexdocs.pm/tflite_elixir>.
 
