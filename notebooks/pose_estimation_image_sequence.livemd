@@ -1,0 +1,525 @@
+# Human Pose Estimation with MoveNet and TensorFlow Lite - Image Sequence
+
+```elixir
+Mix.install([
+  {:tflite_beam, "0.2.0"},
+  {:evision, "0.1.30"},
+  {:kino, "~> 0.8.0"},
+  {:req, "~> 0.3.0"}
+])
+```
+
+## Introduction
+
+Pose estimation is the task of using an ML model to estimate the pose of a
+person from an image or a video by estimating the spatial locations of key body
+joints (keypoints).
+
+This notebook demonstrates how to apply intelligent cropping based on
+detections from the previous frame when the input is a sequence of frames. This
+allows the model to devote its attention and resources to the main subject,
+resulting in much better prediction quality without sacrificing the speed.
+
+https://www.tensorflow.org/lite/examples/pose_estimation/overview
+
+https://www.tensorflow.org/hub/tutorials/movenet
+
+## Alias modules
+
+```elixir
+alias Evision, as: Cv
+alias TFLiteBEAM, as: TFLite
+alias TFLiteBEAM.TFLiteTensor
+```
+
+## Download data files
+
+```elixir
+downloads_dir = System.tmp_dir!()
+# for nerves demo user
+# change to a directory with write-permission
+# downloads_dir = "/data/livebook"
+
+download = fn url ->
+  save_as = Path.join(downloads_dir, URI.encode_www_form(url))
+  unless File.exists?(save_as), do: Req.get!(url, output: save_as)
+  save_as
+end
+
+data_files =
+  [
+    input_gif:
+      "https://github.com/tensorflow/tfjs-models/raw/master/pose-detection/assets/dance_input.gif",
+    movenet_model:
+      "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/3?lite-format=tflite"
+  ]
+  |> Enum.map(fn {key, url} -> {key, download.(url)} end)
+  |> Map.new()
+```
+
+## Load input images
+
+```elixir
+defmodule PoseEstimation.Frame do
+  # Load images from a GIF file and convert them into Nx tensors
+  def load_gif_file(gif_file) do
+    {:ok, frames, _} = StbImage.read_gif_file(gif_file)
+    frames |> Enum.map(&StbImage.to_nx(&1))
+  end
+
+  def cv_mat_from_nx_2d(%Nx.Tensor{} = image_nx) do
+    image_nx |> Cv.Mat.from_nx_2d() |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+  end
+
+  def animate_frames([%Cv.Mat{} | _] = image_mat_list) do
+    interval_ms = 100
+    how_many = length(image_mat_list)
+
+    Stream.interval(interval_ms)
+    |> Stream.take(how_many)
+    |> Kino.animate(&Enum.at(image_mat_list, &1))
+  end
+end
+```
+
+```elixir
+frame_tensors = PoseEstimation.Frame.load_gif_file(data_files.input_gif)
+
+frame_tensors
+|> Enum.map(&PoseEstimation.Frame.cv_mat_from_nx_2d/1)
+|> PoseEstimation.Frame.animate_frames()
+```
+
+## Define helper functions
+
+```elixir
+defmodule PoseEstimation.Color do
+  def black, do: {0, 0, 0}
+  def blue, do: {255, 0, 0}
+  def green, do: {0, 255, 0}
+  def red, do: {0, 0, 255}
+  def yellow, do: {0, 255, 255}
+  def magenta, do: {255, 0, 255}
+  def cyan, do: {255, 255, 0}
+  def white, do: {255, 255, 255}
+end
+```
+
+```elixir
+defmodule PoseEstimation.Cropping do
+  def calc_image_in_square(%Cv.Mat{} = input_image_mat, desired_size)
+      when is_number(desired_size) do
+    {original_height, original_width, _} = Cv.Mat.shape(input_image_mat)
+    scale_factor = desired_size / Enum.max([original_height, original_width])
+    inner_height = trunc(original_height * scale_factor)
+    inner_width = trunc(original_width * scale_factor)
+    inner_offset_x = div(desired_size - inner_width, 2)
+    inner_offset_y = div(desired_size - inner_height, 2)
+
+    %{
+      scale_factor: scale_factor,
+      desired_size: desired_size,
+      inner_offset_x: inner_offset_x,
+      inner_offset_y: inner_offset_y,
+      inner_height: inner_height,
+      inner_width: inner_width,
+      original_height: original_height,
+      original_width: original_width
+    }
+  end
+
+  def resize_with_pad(%Cv.Mat{} = input_image_mat, desired_size) when is_number(desired_size) do
+    data = calc_image_in_square(input_image_mat, desired_size)
+
+    delta_w = desired_size - data.inner_width
+    delta_h = desired_size - data.inner_height
+    {top, bottom} = {div(delta_h, 2), delta_h - div(delta_h, 2)}
+    {left, right} = {div(delta_w, 2), delta_w - div(delta_w, 2)}
+
+    # The new size should be in (width, height) format
+    mat =
+      input_image_mat
+      |> Cv.resize({data.inner_width, data.inner_height})
+      |> Cv.copyMakeBorder(top, bottom, left, right, Cv.Constant.cv_BORDER_CONSTANT())
+
+    %{data: data, mat: mat}
+  end
+
+  def calc_crop_region({outer_height, outer_width}, center: {point_x, point_y}) do
+    crop_size = Enum.min([outer_height, outer_width])
+    crop_size_half = div(crop_size, 2)
+
+    if outer_width > outer_width do
+      %{
+        start_point: {0, point_y - crop_size_half},
+        end_point: {0 + crop_size, point_y + crop_size_half}
+      }
+    else
+      %{
+        start_point: {point_x - crop_size_half, 0},
+        end_point: {point_x + crop_size_half, crop_size}
+      }
+    end
+  end
+
+  def calc_crop_region({outer_height, outer_width}, start_point: {square_start_x, square_start_y}) do
+    if outer_height > outer_width do
+      %{
+        start_point: {0, square_start_y},
+        end_point: {outer_width, square_start_y + outer_width}
+      }
+    else
+      %{
+        start_point: {square_start_x, 0},
+        end_point: {square_start_x + outer_height, outer_height}
+      }
+    end
+  end
+end
+```
+
+```elixir
+defmodule PoseEstimation.Keypoint do
+  alias PoseEstimation.Color
+
+  def keypoint_names do
+    [
+      :nose,
+      :left_eye,
+      :right_eye,
+      :left_ear,
+      :right_ear,
+      :left_shoulder,
+      :right_shoulder,
+      :left_elbow,
+      :right_elbow,
+      :left_wrist,
+      :right_wrist,
+      :left_hip,
+      :right_hip,
+      :left_knee,
+      :right_knee,
+      :left_ankle,
+      :right_ankle
+    ]
+  end
+
+  def keypoint_edge_to_color() do
+    %{
+      {0, 1} => Color.magenta(),
+      {0, 2} => Color.cyan(),
+      {1, 3} => Color.magenta(),
+      {2, 4} => Color.cyan(),
+      {0, 5} => Color.magenta(),
+      {0, 6} => Color.cyan(),
+      {5, 7} => Color.magenta(),
+      {7, 9} => Color.magenta(),
+      {6, 8} => Color.cyan(),
+      {8, 10} => Color.cyan(),
+      {5, 6} => Color.yellow(),
+      {5, 11} => Color.magenta(),
+      {6, 12} => Color.cyan(),
+      {11, 12} => Color.yellow(),
+      {11, 13} => Color.magenta(),
+      {13, 15} => Color.magenta(),
+      {12, 14} => Color.cyan(),
+      {14, 16} => Color.cyan()
+    }
+  end
+
+  def calc_keypoints(keypoints_with_scores, size, {offset_x, offset_y} \\ {0, 0})
+      when is_list(keypoints_with_scores) and is_number(size) do
+    score_threshold = 0.11
+
+    keypoints_with_scores
+    |> Enum.zip(keypoint_names())
+    |> Enum.with_index(fn {[y, x, score], name}, index ->
+      if score > score_threshold do
+        %{x: x * size + offset_x, y: y * size + offset_y, name: name, index: index, score: score}
+      else
+        nil
+      end
+    end)
+  end
+
+  def calc_keypoint_edges(keypoints) when is_list(keypoints) do
+    keypoint_edge_to_color()
+    |> Enum.reduce([], fn {{start_point_index, end_point_index}, color}, acc ->
+      start_point = keypoints |> Enum.at(start_point_index)
+      end_point = keypoints |> Enum.at(end_point_index)
+
+      if is_nil(start_point) or is_nil(end_point) do
+        acc
+      else
+        [%{start_point: start_point, end_point: end_point, color: color} | acc]
+      end
+    end)
+  end
+
+  def draw_keypoints(%Cv.Mat{} = image_mat, keypoints) when is_list(keypoints) do
+    keypoints
+    |> Enum.reduce(image_mat, fn
+      nil, acc_mat ->
+        acc_mat
+
+      point, acc_mat ->
+        acc_mat |> Cv.circle({trunc(point.x), trunc(point.y)}, 2, Color.red(), thickness: 2)
+    end)
+  end
+
+  def draw_keypoint_edges(%Cv.Mat{} = image_mat, edges) when is_list(edges) do
+    edges
+    |> Enum.reduce(image_mat, fn edge, acc_mat ->
+      point1 = {trunc(edge.start_point.x), trunc(edge.start_point.y)}
+      point2 = {trunc(edge.end_point.x), trunc(edge.end_point.y)}
+      acc_mat |> Cv.line(point1, point2, edge.color, thickness: 2)
+    end)
+  end
+
+  def minmax_keypoints(keypoints) when is_list(keypoints) do
+    keypoints
+    |> Enum.reduce(
+      %{x_min: nil, x_max: nil, y_min: nil, y_max: nil},
+      fn
+        nil, acc ->
+          acc
+
+        keypoint, acc ->
+          acc =
+            if is_nil(acc.x_min) or keypoint.x < acc.x_min,
+              do: %{acc | x_min: keypoint.x},
+              else: acc
+
+          acc =
+            if is_nil(acc.x_max) or keypoint.x > acc.x_max,
+              do: %{acc | x_max: keypoint.x},
+              else: acc
+
+          acc =
+            if is_nil(acc.y_min) or keypoint.y < acc.y_min,
+              do: %{acc | y_min: keypoint.y},
+              else: acc
+
+          acc =
+            if is_nil(acc.y_max) or keypoint.y > acc.y_max,
+              do: %{acc | y_max: keypoint.y},
+              else: acc
+
+          acc
+      end
+    )
+  end
+
+  def calc_center_from_keypoints(keypoints) when is_list(keypoints) do
+    %{x_min: x_min, x_max: x_max, y_min: y_min, y_max: y_max} = minmax_keypoints(keypoints)
+    midpoint_x = trunc((x_min + x_max) / 2)
+    midpoint_y = trunc((y_min + y_max) / 2)
+    {midpoint_x, midpoint_y}
+  end
+
+  def torso_visible?(keypoints, score_threshold \\ 0.2) when is_list(keypoints) do
+    keypoints
+    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(&(&1.name in [:left_shoulder, :right_shoulder, :left_hip, :right_hip]))
+    |> Enum.all?(&(&1.score > score_threshold))
+  end
+end
+```
+
+```elixir
+defmodule PoseEstimation.Inference do
+  def init(movenet_model) do
+    TFLite.Interpreter.new(movenet_model)
+  end
+
+  def run(interpreter, %Nx.Tensor{} = input_image_nx) do
+    # Run the model
+    TFLite.Interpreter.input_tensor(interpreter, 0, Nx.to_binary(input_image_nx))
+    TFLite.Interpreter.invoke(interpreter)
+
+    # Get the model prediction
+    {:ok, output_data} = TFLite.Interpreter.output_tensor(interpreter, 0)
+    output_data |> Nx.from_binary({:f, 32}) |> Nx.reshape({17, 3})
+  end
+end
+```
+
+## Determine initial crop region
+
+```elixir
+defmodule PoseEstimation.InitialCropRegion do
+  alias PoseEstimation.Cropping
+  alias PoseEstimation.Keypoint
+  alias PoseEstimation.Inference
+
+  def get(interpreter, %Cv.Mat{} = image_mat) do
+    {img_height, img_width, _} = Cv.Mat.shape(image_mat)
+
+    calc_initial_crop_region(interpreter, image_mat) ||
+      calc_default_crop_region({img_height, img_width})
+  end
+
+  defp calc_default_crop_region({img_height, img_width}) do
+    Cropping.calc_crop_region(
+      {img_height, img_width},
+      center: {trunc(img_width / 2), trunc(img_height / 2)}
+    )
+  end
+
+  defp calc_initial_crop_region(interpreter, %Cv.Mat{} = image_mat) do
+    # Resize and pad the image to keep the aspect ratio and fit the expected size
+    image_in_256x256_square = Cropping.resize_with_pad(image_mat, 256)
+
+    %{
+      inner_height: inner_height,
+      inner_width: inner_width,
+      inner_offset_x: inner_offset_x,
+      inner_offset_y: inner_offset_y,
+      original_height: original_height,
+      original_width: original_width,
+      scale_factor: scale_factor
+    } = image_in_256x256_square.data
+
+    initial_input_image_nx =
+      image_in_256x256_square.mat
+      |> Cv.Mat.to_nx(Nx.BinaryBackend)
+      |> Nx.new_axis(0)
+      |> Nx.as_type({:f, 32})
+
+    # Run model inference
+    keypoints_with_scores = Inference.run(interpreter, initial_input_image_nx)
+
+    # Calculate keypoints
+    keypoints = Keypoint.calc_keypoints(Nx.to_list(keypoints_with_scores), 256)
+
+    if Keypoint.torso_visible?(keypoints) do
+      # Calculate crop region in inner image based on midpoint
+      crop_region =
+        Cropping.calc_crop_region(
+          {inner_height, inner_width},
+          center: Keypoint.calc_center_from_keypoints(keypoints)
+        )
+
+      # Project crop region onto original image
+      Cropping.calc_crop_region(
+        {original_height, original_width},
+        start_point: {
+          trunc((elem(crop_region.start_point, 0) + inner_offset_x) / scale_factor),
+          trunc((elem(crop_region.start_point, 1) + inner_offset_y) / scale_factor)
+        }
+      )
+    else
+      nil
+    end
+  end
+end
+```
+
+```elixir
+{:ok, interpreter} = PoseEstimation.Inference.init(data_files.movenet_model)
+
+first_frame_mat = hd(frame_tensors) |> PoseEstimation.Frame.cv_mat_from_nx_2d()
+{frame_height, frame_width, _} = first_frame_mat.shape
+initial_crop_region = PoseEstimation.InitialCropRegion.get(interpreter, first_frame_mat)
+
+first_frame_mat
+|> Cv.rectangle(
+  initial_crop_region.start_point,
+  initial_crop_region.end_point,
+  PoseEstimation.Color.green(),
+  thickness: 2
+)
+```
+
+## Run inference with cropping algorithm
+
+* Input is a frame of video represented as an float32 tensor of shape: 256x256x3. Channels order is RGB with values in [0, 255].
+* Output is a float32 tensor of shape [1, 1, 17, 3]
+* See https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/3
+
+```elixir
+defmodule PoseEstimation.Main do
+  alias PoseEstimation.Color
+  alias PoseEstimation.Cropping
+  alias PoseEstimation.Frame
+  alias PoseEstimation.Inference
+  alias PoseEstimation.InitialCropRegion
+  alias PoseEstimation.Keypoint
+
+  def main(movenet_model, [%Nx.Tensor{} | _] = frame_tensors) do
+    {:ok, interpreter} = Inference.init(movenet_model)
+
+    first_frame_nx = hd(frame_tensors) |> Frame.cv_mat_from_nx_2d()
+    {frame_height, frame_width, _} = first_frame_nx.shape
+    initial_crop_region = InitialCropRegion.get(interpreter, first_frame_nx)
+
+    frame_tensors
+    |> Enum.reduce(
+      %{crop_region: initial_crop_region, output_images: []},
+      fn frame_tensor, acc ->
+        {crop_start_x, crop_start_y} = acc.crop_region.start_point
+        {crop_end_x, crop_end_y} = acc.crop_region.end_point
+        input_image_mat = Frame.cv_mat_from_nx_2d(frame_tensor)
+
+        # Crop image and resize it down to 256x256
+        input_image_cropped_mat =
+          input_image_mat[[{crop_start_y, crop_end_y}, {crop_start_x, crop_end_x}]]
+          |> Cv.resize({256, 256})
+
+        input_image_cropped_nx =
+          input_image_cropped_mat
+          |> Cv.Mat.to_nx(Nx.BinaryBackend)
+          |> Nx.new_axis(0)
+          |> Nx.as_type({:f, 32})
+
+        # Run model inference
+        keypoints_with_scores_nx = Inference.run(interpreter, input_image_cropped_nx)
+
+        # Calculate keypoints
+        keypoints =
+          keypoints_with_scores_nx
+          |> Nx.to_list()
+          |> Keypoint.calc_keypoints(frame_height, {crop_start_x, crop_start_y})
+
+        if Keypoint.torso_visible?(keypoints) do
+          keypoint_edges = Keypoint.calc_keypoint_edges(keypoints)
+
+          # Fit square to image
+          new_crop_region =
+            Cropping.calc_crop_region(
+              {frame_height, frame_width},
+              center: Keypoint.calc_center_from_keypoints(keypoints)
+            )
+
+          # Draw prediction on image
+          frame_mat =
+            input_image_mat
+            |> Keypoint.draw_keypoint_edges(keypoint_edges)
+            |> Keypoint.draw_keypoints(keypoints)
+            |> Cv.rectangle(
+              new_crop_region.start_point,
+              new_crop_region.end_point,
+              Color.green(),
+              thickness: 2
+            )
+
+          %{acc | crop_region: new_crop_region, output_images: [frame_mat | acc.output_images]}
+        else
+          acc
+        end
+      end
+    )
+    |> Map.fetch!(:output_images)
+    |> Enum.reverse()
+  end
+end
+```
+
+```elixir
+output_images = PoseEstimation.Main.main(data_files.movenet_model, frame_tensors)
+```
+
+```elixir
+# Visualize the predictions
+PoseEstimation.Frame.animate_frames(output_images)
+```
