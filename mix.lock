@@ -20,6 +20,6 @@
   "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.6", "cf344f5692c82d2cd7554f5ec8fd961548d4fd09e7d22f5b62482e5aeaebd4b0", [:make, :mix, :rebar3], [], "hexpm", "bdb0d2471f453c88ff3908e7686f86f9be327d065cc1ec16fa4540197ea04680"},
   "stb_image": {:hex, :stb_image, "0.6.1", "0749a2ca9a2f1f722e31f6c8ec32062684939a260924cafe66a92331c4862dd8", [:make, :mix], [{:cc_precompiler, "~> 0.1.0", [hex: :cc_precompiler, repo: "hexpm", optional: false]}, {:elixir_make, "~> 0.7.0", [hex: :elixir_make, repo: "hexpm", optional: false]}, {:kino, "~> 0.7", [hex: :kino, repo: "hexpm", optional: true]}, {:nx, "~> 0.4", [hex: :nx, repo: "hexpm", optional: true]}], "hexpm", "7aa2035e314272aa165c5d09dae2f6b09e648abbc1c68ad20a2e029494858f4b"},
   "telemetry": {:hex, :telemetry, "1.2.1", "68fdfe8d8f05a8428483a97d7aab2f268aaff24b49e0f599faa091f1d4e7f61c", [:rebar3], [], "hexpm", "dad9ce9d8effc621708f99eac538ef1cbe05d6a874dd741de2e689c47feafed5"},
-  "tflite_beam": {:hex, :tflite_beam, "0.3.0", "5598a74a3861befcb181d91ff8168de9ff9ee3770dbc9eda85d636d93da18c9b", [:rebar3], [], "hexpm", "6618ba2abb5cd1ba3d78bf15ea03f81a63f1a35e0807198fd61c6e9c3799b97e"},
+  "tflite_beam": {:hex, :tflite_beam, "0.3.1", "b8700a9e051ba6277f8e39327581804d4a6551f446823a90dc18b47e3f9aca47", [:rebar3], [], "hexpm", "1892c628ac65268b8eacd5c31ba88540f818ae1d6e9a8efc69e3d1750aeba5af"},
   "unicode_util_compat": {:hex, :unicode_util_compat, "0.7.0", "bc84380c9ab48177092f43ac89e4dfa2c6d62b40b8bd132b1059ecc7232f9a78", [:rebar3], [], "hexpm", "25eee6d67df61960cf6a794239566599b09e17e668d3700247bc498638152521"},
 }
