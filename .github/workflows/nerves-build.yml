@@ -39,6 +39,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   mix-firmware:
     runs-on: ubuntu-20.04
