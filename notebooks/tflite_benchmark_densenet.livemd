@@ -65,10 +65,10 @@ defmodule ClassifyImage do
   Code based on [classify_image.py](https://github.com/google-coral/pycoral/blob/master/examples/classify_image.py)
   """
 
-  alias TFLiteBEAM.Interpreter
-  alias TFLiteBEAM.InterpreterBuilder
-  alias TFLiteBEAM.TFLiteTensor
-  alias TFLiteBEAM.FlatBufferModel
+  alias TFLiteElixir.Interpreter
+  alias TFLiteElixir.InterpreterBuilder
+  alias TFLiteElixir.TFLiteTensor
+  alias TFLiteElixir.FlatBufferModel
 
   def run(args) do
     default_values = [

@@ -66,8 +66,8 @@ data_files =
 
 ```elixir
 alias Evision, as: Cv
-alias TFLiteBEAM, as: TFLite
-alias TFLiteBEAM.TFLiteTensor
+alias TFLiteElixir, as: TFLite
+alias TFLiteElixir.TFLiteTensor
 ```
 
 ## Pre-process the inputs
