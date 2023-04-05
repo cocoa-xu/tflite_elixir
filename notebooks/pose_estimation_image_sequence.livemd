@@ -263,7 +263,12 @@ defmodule PoseEstimation.Keypoint do
         acc_mat
 
       point, acc_mat ->
-        acc_mat |> Cv.circle({trunc(point.x), trunc(point.y)}, 2, Color.red(), thickness: 2)
+        acc_mat
+        |> Cv.drawMarker({trunc(point.x), trunc(point.y)}, Color.red(),
+          markerSize: 2,
+          markerType: Cv.Constant.cv_MARKER_SQUARE(),
+          thickness: 2
+        )
     end)
   end
 
