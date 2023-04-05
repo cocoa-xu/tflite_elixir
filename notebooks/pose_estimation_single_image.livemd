@@ -62,7 +62,7 @@ alias TFLiteElixir.TFLiteTensor
 ## Load input image
 
 * Input is a frame of video or an image, represented as an float32 tensor of
-shape: 256x256x3. Channels order is RGB with values in [0, 255].
+  shape: 256x256x3. Channels order is RGB with values in [0, 255].
 * See https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/3
 
 ```elixir
@@ -119,8 +119,8 @@ TFLite.Interpreter.invoke(interpreter)
 {:ok, [tflite_tensor_index]} = TFLite.Interpreter.outputs(interpreter)
 tflite_tensor = TFLite.Interpreter.tensor(interpreter, tflite_tensor_index)
 
-{:f, 32} = output_type = tflite_tensor.type
-{1, 1, 17, 3} = output_shape = List.to_tuple(tflite_tensor.shape)
+{:f, 32} = output_type = TFLiteTensor.type(tflite_tensor)
+{1, 1, 17, 3} = output_shape = TFLiteTensor.shape(tflite_tensor)
 
 keypoints_with_scores =
   output_data
