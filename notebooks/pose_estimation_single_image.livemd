@@ -214,13 +214,12 @@ keypoint_edges =
 draw_keypoints = fn %Cv.Mat{} = input_image_mat, keypoints ->
   for %{x: x, y: y} <- keypoints, reduce: input_image_mat do
     acc_mat ->
-      Cv.circle(
+      Cv.drawMarker(
         acc_mat,
         {trunc(x), trunc(y)},
-        3,
         {0, 0, 255},
-        thickness: 5,
-        lineType: Cv.Constant.cv_FILLED()
+        markerSize: 10,
+        thickness: 3
       )
   end
 end
