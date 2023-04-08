@@ -57,7 +57,20 @@ data_files =
   |> Map.new()
 ```
 
-## Load input images
+## Define helper functions
+
+```elixir
+defmodule PoseEstimation.Color do
+  def black, do: {0, 0, 0}
+  def blue, do: {255, 0, 0}
+  def green, do: {0, 255, 0}
+  def red, do: {0, 0, 255}
+  def yellow, do: {0, 255, 255}
+  def magenta, do: {255, 0, 255}
+  def cyan, do: {255, 255, 0}
+  def white, do: {255, 255, 255}
+end
+```
 
 ```elixir
 defmodule PoseEstimation.Frame do
@@ -83,44 +96,17 @@ end
 ```
 
 ```elixir
-frame_tensors = PoseEstimation.Frame.load_gif_file(data_files.input_gif)
-
-frame_tensors
-|> Enum.map(&PoseEstimation.Frame.cv_mat_from_nx_2d/1)
-|> PoseEstimation.Frame.animate_frames()
-```
-
-## Define helper functions
-
-```elixir
-defmodule PoseEstimation.Color do
-  def black, do: {0, 0, 0}
-  def blue, do: {255, 0, 0}
-  def green, do: {0, 255, 0}
-  def red, do: {0, 0, 255}
-  def yellow, do: {0, 255, 255}
-  def magenta, do: {255, 0, 255}
-  def cyan, do: {255, 255, 0}
-  def white, do: {255, 255, 255}
-end
-```
-
-```elixir
 defmodule PoseEstimation.Cropping do
-  def calc_image_in_square(%Cv.Mat{} = input_image_mat, desired_size)
-      when is_number(desired_size) do
-    {original_height, original_width, _} = Cv.Mat.shape(input_image_mat)
+  def calc_image_in_square({original_height, original_width}, desired_size) do
     scale_factor = desired_size / Enum.max([original_height, original_width])
     inner_height = trunc(original_height * scale_factor)
     inner_width = trunc(original_width * scale_factor)
-    inner_offset_x = div(desired_size - inner_width, 2)
-    inner_offset_y = div(desired_size - inner_height, 2)
 
     %{
       scale_factor: scale_factor,
       desired_size: desired_size,
-      inner_offset_x: inner_offset_x,
-      inner_offset_y: inner_offset_y,
+      inner_offset_x: div(desired_size - inner_width, 2),
+      inner_offset_y: div(desired_size - inner_height, 2),
       inner_height: inner_height,
       inner_width: inner_width,
       original_height: original_height,
@@ -128,8 +114,9 @@ defmodule PoseEstimation.Cropping do
     }
   end
 
-  def resize_with_pad(%Cv.Mat{} = input_image_mat, desired_size) when is_number(desired_size) do
-    data = calc_image_in_square(input_image_mat, desired_size)
+  def resize_with_pad(%Cv.Mat{} = input_mat, desired_size) when is_number(desired_size) do
+    {original_height, original_width, _} = Cv.Mat.shape(input_mat)
+    data = calc_image_in_square({original_height, original_width}, desired_size)
 
     delta_w = desired_size - data.inner_width
     delta_h = desired_size - data.inner_height
@@ -137,15 +124,15 @@ defmodule PoseEstimation.Cropping do
     {left, right} = {div(delta_w, 2), delta_w - div(delta_w, 2)}
 
     # The new size should be in (width, height) format
-    mat =
-      input_image_mat
+    new_mat =
+      input_mat
       |> Cv.resize({data.inner_width, data.inner_height})
       |> Cv.copyMakeBorder(top, bottom, left, right, Cv.Constant.cv_BORDER_CONSTANT())
 
-    %{data: data, mat: mat}
+    %{data: data, mat: new_mat}
   end
 
-  def calc_crop_region({outer_height, outer_width}, center: {point_x, point_y}) do
+  def calc_crop_region({outer_height, outer_width}, {point_x, point_y}) do
     crop_size = Enum.min([outer_height, outer_width])
     crop_size_half = div(crop_size, 2)
 
@@ -158,20 +145,6 @@ defmodule PoseEstimation.Cropping do
       %{
         start_point: {point_x - crop_size_half, 0},
         end_point: {point_x + crop_size_half, crop_size}
-      }
-    end
-  end
-
-  def calc_crop_region({outer_height, outer_width}, start_point: {square_start_x, square_start_y}) do
-    if outer_height > outer_width do
-      %{
-        start_point: {0, square_start_y},
-        end_point: {outer_width, square_start_y + outer_width}
-      }
-    else
-      %{
-        start_point: {square_start_x, 0},
-        end_point: {square_start_x + outer_height, outer_height}
       }
     end
   end
@@ -233,9 +206,9 @@ defmodule PoseEstimation.Keypoint do
 
     keypoints_with_scores
     |> Enum.zip(keypoint_names())
-    |> Enum.with_index(fn {[y, x, score], name}, index ->
+    |> Enum.map(fn {[y, x, score], name} ->
       if score > score_threshold do
-        %{x: x * size + offset_x, y: y * size + offset_y, name: name, index: index, score: score}
+        %{x: x * size + offset_x, y: y * size + offset_y, name: name, score: score}
       else
         nil
       end
@@ -263,7 +236,12 @@ defmodule PoseEstimation.Keypoint do
         acc_mat
 
       point, acc_mat ->
-        acc_mat |> Cv.circle({trunc(point.x), trunc(point.y)}, 2, Color.red(), thickness: 2)
+        acc_mat
+        |> Cv.drawMarker({trunc(point.x), trunc(point.y)}, Color.red(),
+          markerSize: 2,
+          markerType: Cv.Constant.cv_MARKER_SQUARE(),
+          thickness: 2
+        )
     end)
   end
 
@@ -276,45 +254,15 @@ defmodule PoseEstimation.Keypoint do
     end)
   end
 
-  def minmax_keypoints(keypoints) when is_list(keypoints) do
-    keypoints
-    |> Enum.reduce(
-      %{x_min: nil, x_max: nil, y_min: nil, y_max: nil},
-      fn
-        nil, acc ->
-          acc
-
-        keypoint, acc ->
-          acc =
-            if is_nil(acc.x_min) or keypoint.x < acc.x_min,
-              do: %{acc | x_min: keypoint.x},
-              else: acc
-
-          acc =
-            if is_nil(acc.x_max) or keypoint.x > acc.x_max,
-              do: %{acc | x_max: keypoint.x},
-              else: acc
-
-          acc =
-            if is_nil(acc.y_min) or keypoint.y < acc.y_min,
-              do: %{acc | y_min: keypoint.y},
-              else: acc
-
-          acc =
-            if is_nil(acc.y_max) or keypoint.y > acc.y_max,
-              do: %{acc | y_max: keypoint.y},
-              else: acc
-
-          acc
-      end
-    )
-  end
-
   def calc_center_from_keypoints(keypoints) when is_list(keypoints) do
-    %{x_min: x_min, x_max: x_max, y_min: y_min, y_max: y_max} = minmax_keypoints(keypoints)
-    midpoint_x = trunc((x_min + x_max) / 2)
-    midpoint_y = trunc((y_min + y_max) / 2)
-    {midpoint_x, midpoint_y}
+    {{center_x, center_y}, _radius} =
+      keypoints
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&[&1.x, &1.y])
+      |> Nx.tensor()
+      |> Cv.minEnclosingCircle()
+
+    {trunc(center_x), trunc(center_y)}
   end
 
   def torso_visible?(keypoints, score_threshold \\ 0.2) when is_list(keypoints) do
@@ -344,6 +292,16 @@ defmodule PoseEstimation.Inference do
 end
 ```
 
+## Load GIF
+
+```elixir
+frame_tensors = PoseEstimation.Frame.load_gif_file(data_files.input_gif)
+
+frame_tensors
+|> Enum.map(&PoseEstimation.Frame.cv_mat_from_nx_2d/1)
+|> PoseEstimation.Frame.animate_frames()
+```
+
 ## Determine initial crop region
 
 ```elixir
@@ -362,7 +320,7 @@ defmodule PoseEstimation.InitialCropRegion do
   defp calc_default_crop_region({img_height, img_width}) do
     Cropping.calc_crop_region(
       {img_height, img_width},
-      center: {trunc(img_width / 2), trunc(img_height / 2)}
+      {trunc(img_width / 2), trunc(img_height / 2)}
     )
   end
 
@@ -397,15 +355,19 @@ defmodule PoseEstimation.InitialCropRegion do
       crop_region =
         Cropping.calc_crop_region(
           {inner_height, inner_width},
-          center: Keypoint.calc_center_from_keypoints(keypoints)
+          Keypoint.calc_center_from_keypoints(keypoints)
         )
+
+      crop_size = if original_height > original_width, do: original_width, else: original_height
 
       # Project crop region onto original image
       Cropping.calc_crop_region(
         {original_height, original_width},
-        start_point: {
-          trunc((elem(crop_region.start_point, 0) + inner_offset_x) / scale_factor),
-          trunc((elem(crop_region.start_point, 1) + inner_offset_y) / scale_factor)
+        {
+          trunc((elem(crop_region.start_point, 0) + inner_offset_x) / scale_factor) +
+            div(crop_size, 2),
+          trunc((elem(crop_region.start_point, 1) + inner_offset_y) / scale_factor) +
+            div(crop_size, 2)
         }
       )
     else
@@ -488,7 +450,7 @@ defmodule PoseEstimation.Main do
           new_crop_region =
             Cropping.calc_crop_region(
               {frame_height, frame_width},
-              center: Keypoint.calc_center_from_keypoints(keypoints)
+              Keypoint.calc_center_from_keypoints(keypoints)
             )
 
           # Draw prediction on image
@@ -517,9 +479,5 @@ end
 
 ```elixir
 output_images = PoseEstimation.Main.main(data_files.movenet_model, frame_tensors)
-```
-
-```elixir
-# Visualize the predictions
 PoseEstimation.Frame.animate_frames(output_images)
 ```
