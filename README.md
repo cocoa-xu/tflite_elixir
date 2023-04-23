@@ -67,9 +67,9 @@ iex> ImageClassification.predict(pid, "test/test_data/parrot.jpeg", top_k: 3)
 
 ### Prebuilt firmware (Experimental)
 
-[![Nerves](https://github-actions.40ants.com/cocoa-xu/tflite_elixir/matrix.svg?only=nerves-build)](https://github.com/cocoa-xu/tflite_elixir)
+[![Nerves](https://github-actions.40ants.com/cocoa-xu/tflite_elixir/matrix.svg?only=nerves-build)](https://github.com/cocoa-xu/tflite_elixir/actions)
 
-Prebuilt firmwares are available [here](https://github.com/cocoa-xu/tflite_elixir/actions/workflows/nerves-build.yml?query=is%3Asuccess).
+Prebuilt firmwares are available [here](https://github.com/cocoa-xu/tflite_elixir/releases). Nightly builds can be found [here](https://github.com/cocoa-xu/tflite_elixir/actions/workflows/nerves-build.yml?query=is%3Asuccess).
 
 Select the most recent run and scroll down to the `Artifacts` section, download the firmware file for your board and run
 
