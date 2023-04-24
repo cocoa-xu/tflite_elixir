@@ -13,6 +13,18 @@ else
 end
 ```
 
+## Introduction
+
+The [Coral USB Accelerator](https://coral.ai/docs/accelerator/get-started) adds a Coral Edge TPU to your Linux, Mac, or Windows computer so you can accelerate your machine learning models.
+
+![](https://i.uwucocoa.moe/system/media_attachments/files/110/051/967/601/428/482/original/d095f799ba85fece.jpeg)
+
+## Detect edge TPU devices
+
+```elixir
+TFLiteElixir.Coral.edge_tpu_devices()
+```
+
 ## Download data files
 
 ```elixir
@@ -84,7 +96,6 @@ defmodule ClassifyImage do
   alias TFLiteElixir.TFLiteTensor
   alias TFLiteElixir.FlatBufferModel
 
-  @shortdoc "Image Classification"
   def run(args) do
     default_values = [
       top: 1,
@@ -267,23 +278,30 @@ end
 ```
 
 ```elixir
-interpreter =
-  ClassifyImage.run(
-    model: data_files.cpu_model,
-    input: data_files.test_image,
-    labels: data_files.class_labels,
-    top: 3,
-    threshold: 0.3,
-    count: 5,
-    mean: 128.0,
-    std: 128.0,
-    use_tpu: false,
-    tpu: ""
-  )
+StbImage.read_file!(data_files.test_image)
 ```
 
+### without TPU
+
 ```elixir
-interpreter =
+ClassifyImage.run(
+  model: data_files.cpu_model,
+  input: data_files.test_image,
+  labels: data_files.class_labels,
+  top: 3,
+  threshold: 0.3,
+  count: 5,
+  mean: 128.0,
+  std: 128.0,
+  use_tpu: false,
+  tpu: ""
+)
+```
+
+### with TPU
+
+```elixir
+if length(TFLiteElixir.Coral.edge_tpu_devices()) > 0 do
   ClassifyImage.run(
     model: data_files.tpu_model,
     input: data_files.test_image,
@@ -296,5 +314,7 @@ interpreter =
     use_tpu: true,
     tpu: "usb"
   )
+else
+  IO.puts("No edge TPU device was found")
+end
 ```
-
