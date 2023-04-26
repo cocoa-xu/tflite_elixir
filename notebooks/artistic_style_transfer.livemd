@@ -1,12 +1,16 @@
 # Artistic Style Transfer with TensorFlow Lite
 
 ```elixir
-Mix.install([
-  {:tflite_elixir, "0.3.0"},
-  {:evision, "0.1.29"},
-  {:kino, "~> 0.8.0"},
-  {:req, "~> 0.3.0"}
-])
+if Code.ensure_loaded?(Nerves.Runtime) do
+  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+else
+  Mix.install([
+    {:tflite_elixir, "0.3.0"},
+    {:evision, "0.1.31"},
+    {:kino, "~> 0.9.0"},
+    {:req, "~> 0.3.0"}
+  ])
+end
 ```
 
 ## Introduction
@@ -31,15 +35,25 @@ This Artistic Style Transfer model consists of two submodels:
    input style image to a 100-dimension style bottleneck vector.
 2. **Style Transform Model**: A neural network that takes apply a style bottleneck vector to a content image and creates a stylized image.
 
+## Alias modules
+
+```elixir
+alias Evision, as: Cv
+alias TFLiteElixir, as: TFLite
+alias TFLiteElixir.TFLiteTensor
+```
+
 ## Download data files
 
 Download the content and style images, and the pre-trained TensorFlow Lite models.
 
 ```elixir
-downloads_dir = System.tmp_dir!()
-# for nerves demo user
-# change to a directory with write-permission
-# downloads_dir = "/data/livebook"
+downloads_dir =
+  if Code.ensure_loaded?(Nerves.Runtime) do
+    "/data/livebook"
+  else
+    System.tmp_dir!()
+  end
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -49,9 +63,9 @@ end
 
 data_files =
   [
-    content:
+    img_content:
       "https://storage.googleapis.com/khanhlvg-public.appspot.com/arbitrary-style-transfer/belfry-2611573_1280.jpg",
-    style:
+    img_style:
       "https://storage.googleapis.com/khanhlvg-public.appspot.com/arbitrary-style-transfer/style23.jpg",
     style_predict:
       "https://tfhub.dev/google/lite-model/magenta/arbitrary-image-stylization-v1-256/int8/prediction/1?lite-format=tflite",
@@ -62,12 +76,44 @@ data_files =
   |> Map.new()
 ```
 
-## Alias modules
+## Load input images
+
+### Content image
 
 ```elixir
-alias Evision, as: Cv
-alias TFLiteElixir, as: TFLite
-alias TFLiteElixir.TFLiteTensor
+content_image_input = Kino.Input.image("")
+```
+
+```elixir
+content_image_mat =
+  case Kino.Input.read(content_image_input) do
+    %{data: data, height: height, width: width} ->
+      Cv.Mat.from_binary(data, {:u, 8}, height, width, 3)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+
+    nil ->
+      Cv.imread(data_files.img_content)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+  end
+```
+
+### Style image
+
+```elixir
+style_image_input = Kino.Input.image("")
+```
+
+```elixir
+style_image_mat =
+  case Kino.Input.read(style_image_input) do
+    %{data: data, height: height, width: width} ->
+      Cv.Mat.from_binary(data, {:u, 8}, height, width, 3)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+
+    nil ->
+      Cv.imread(data_files.img_style)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+  end
 ```
 
 ## Pre-process the inputs
@@ -80,14 +126,6 @@ alias TFLiteElixir.TFLiteTensor
   resize it.
 
 ```elixir
-# Load an image from a file, and add a batch dimension.
-load_image = fn path_to_img ->
-  path_to_img
-  |> Cv.imread()
-  |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB(), dstCn: 3)
-end
-
-# Function to pre-process by resizing an central cropping it.
 preprocess_image = fn image, target_dim ->
   # Resize the image so that the shorter dimension becomes 256px.
   {h, w, _} = image.shape
@@ -95,18 +133,18 @@ preprocess_image = fn image, target_dim ->
   {resize_h, resize_w} =
     if h > w do
       scale = target_dim / w
-      {trunc(h * scale), target_dim}
+      {round(h * scale), target_dim}
     else
       scale = target_dim / h
-      {target_dim, trunc(w * scale)}
+      {target_dim, round(w * scale)}
     end
 
   image = Cv.resize(image, {resize_h, resize_w})
 
   # Central crop the image.
   {centre_h, centre_w} = {resize_h / 2, resize_w / 2}
-  x = trunc(centre_w - target_dim / 2)
-  y = trunc(centre_h - target_dim / 2)
+  x = round(centre_w - target_dim / 2)
+  y = round(centre_h - target_dim / 2)
   new_shape = {y, x, target_dim, target_dim}
   cropped_image = Cv.Mat.roi(image, new_shape)
 
@@ -124,33 +162,27 @@ preprocess_image = fn image, target_dim ->
   }
 end
 
-# Load the input images.
-%Cv.Mat{} = content_image = load_image.(data_files.content)
-%Cv.Mat{} = style_image = load_image.(data_files.style)
-
 # Preprocess the input images.
-%{} = preprocessed_content = preprocess_image.(content_image, 384)
-%{} = preprocessed_style = preprocess_image.(style_image, 256)
+preprocessed_content = preprocess_image.(content_image_mat, 384)
+preprocessed_style = preprocess_image.(style_image_mat, 256)
 
 IO.puts(["Style Image Shape: ", inspect(preprocessed_style.tensor.shape)])
 IO.puts(["Content Image Shape: ", inspect(preprocessed_content.tensor.shape)])
 ```
 
-## Visualize the inputs
+### Content image
 
 ```elixir
-IO.puts("Content Image")
 preprocessed_content.image
 ```
 
+### Style image
+
 ```elixir
-IO.puts("Style Image")
 preprocessed_style.image
 ```
 
-## Run style transfer with TensorFlow Lite
-
-### Style prediction
+## Run style prediction
 
 ```elixir
 # Run style prediction on preprocessed style image.
@@ -172,11 +204,9 @@ run_style_predict = fn <<_::binary>> = preprocessed_style_data ->
 end
 
 style_bottleneck = run_style_predict.(Nx.to_binary(preprocessed_style.tensor))
-
-IO.puts(["Style Bottleneck Shape: ", inspect(style_bottleneck.shape)])
 ```
 
-### Style transform
+## Run style transform
 
 ```elixir
 # Run style transform on preprocessed style image.
@@ -209,19 +239,18 @@ run_style_transform = fn <<_::binary>> = style_bottleneck_data,
 end
 
 # Stylize the content image using the style bottleneck.
-_stylized_image =
-  run_style_transform.(
-    Nx.to_binary(style_bottleneck),
-    Nx.to_binary(preprocessed_content.tensor)
-  )
+run_style_transform.(
+  Nx.to_binary(style_bottleneck),
+  Nx.to_binary(preprocessed_content.tensor)
+)
 ```
 
-### Style blending
+## Run style blending
 
 ```elixir
 # Calculate style bottleneck of the content image.
 style_bottleneck_content =
-  preprocess_image.(content_image, 256).tensor
+  preprocess_image.(content_image_mat, 256).tensor
   |> Nx.to_binary()
   |> run_style_predict.()
 ```
@@ -238,11 +267,12 @@ style_bottleneck_blended =
     Nx.multiply(content_blending_ratio, style_bottleneck_content),
     Nx.multiply(1 - content_blending_ratio, style_bottleneck)
   )
+```
 
+```elixir
 # Stylize the content image using the style bottleneck.
-stylized_image_blended =
-  run_style_transform.(
-    Nx.to_binary(style_bottleneck_blended),
-    Nx.to_binary(preprocessed_content.tensor)
-  )
+run_style_transform.(
+  Nx.to_binary(style_bottleneck_blended),
+  Nx.to_binary(preprocessed_content.tensor)
+)
 ```
