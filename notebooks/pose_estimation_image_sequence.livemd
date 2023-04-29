@@ -1,12 +1,28 @@
-# Human Pose Estimation with MoveNet and TensorFlow Lite - Image Sequence
+# Human pose estimation on image sequence
 
 ```elixir
-Mix.install([
-  {:tflite_elixir, "0.3.0"},
-  {:evision, "0.1.30"},
-  {:kino, "~> 0.8.0"},
-  {:req, "~> 0.3.0"}
-])
+if Code.ensure_loaded?(Nerves.Runtime) do
+  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
+else
+  Mix.install([
+    {:tflite_elixir, "~> 0.3.0"},
+    {:evision, "0.1.31"},
+    {:req, "~> 0.3.0"},
+    {:kino, "~> 0.9.0"}
+  ])
+end
 ```
 
 ## Introduction
@@ -24,7 +40,9 @@ https://www.tensorflow.org/lite/examples/pose_estimation/overview
 
 https://www.tensorflow.org/hub/tutorials/movenet
 
-## Alias modules
+<!-- livebook:{"break_markdown":true} -->
+
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
 
 ```elixir
 alias Evision, as: Cv
@@ -35,10 +53,9 @@ alias TFLiteElixir.TFLiteTensor
 ## Download data files
 
 ```elixir
-downloads_dir = System.tmp_dir!()
-# for nerves demo user
-# change to a directory with write-permission
-# downloads_dir = "/data/livebook"
+# /data is the writable portion of a Nerves system
+downloads_dir =
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -55,6 +72,10 @@ data_files =
   ]
   |> Enum.map(fn {key, url} -> {key, download.(url)} end)
   |> Map.new()
+
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
 ```
 
 ## Define helper functions
