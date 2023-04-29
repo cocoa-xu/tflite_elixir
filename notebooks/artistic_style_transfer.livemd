@@ -1,14 +1,26 @@
-# Artistic Style Transfer with TensorFlow Lite
+# Artistic Style Transfer
 
 ```elixir
 if Code.ensure_loaded?(Nerves.Runtime) do
   IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
 else
   Mix.install([
-    {:tflite_elixir, "0.3.0"},
+    {:tflite_elixir, "~> 0.3.0"},
     {:evision, "0.1.31"},
-    {:kino, "~> 0.9.0"},
-    {:req, "~> 0.3.0"}
+    {:req, "~> 0.3.0"},
+    {:kino, "~> 0.9.0"}
   ])
 end
 ```
@@ -35,7 +47,7 @@ This Artistic Style Transfer model consists of two submodels:
    input style image to a 100-dimension style bottleneck vector.
 2. **Style Transform Model**: A neural network that takes apply a style bottleneck vector to a content image and creates a stylized image.
 
-## Alias modules
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
 
 ```elixir
 alias Evision, as: Cv
@@ -48,12 +60,9 @@ alias TFLiteElixir.TFLiteTensor
 Download the content and style images, and the pre-trained TensorFlow Lite models.
 
 ```elixir
+# /data is the writable portion of a Nerves system
 downloads_dir =
-  if Code.ensure_loaded?(Nerves.Runtime) do
-    "/data/livebook"
-  else
-    System.tmp_dir!()
-  end
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -74,14 +83,16 @@ data_files =
   ]
   |> Enum.map(fn {key, url} -> {key, download.(url)} end)
   |> Map.new()
+
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
 ```
 
 ## Load input images
 
-### Content image
-
 ```elixir
-content_image_input = Kino.Input.image("")
+content_image_input = Kino.Input.image("Content image")
 ```
 
 ```elixir
@@ -95,12 +106,12 @@ content_image_mat =
       Cv.imread(data_files.img_content)
       |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
   end
+
+:ok
 ```
 
-### Style image
-
 ```elixir
-style_image_input = Kino.Input.image("")
+style_image_input = Kino.Input.image("Style image")
 ```
 
 ```elixir
@@ -112,8 +123,20 @@ style_image_mat =
 
     nil ->
       Cv.imread(data_files.img_style)
-      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
   end
+
+:ok
+```
+
+```elixir
+[
+  ["Content image", content_image_mat],
+  ["Style image", style_image_mat]
+]
+|> Enum.map(fn [label, img] ->
+  Kino.Layout.grid([img, Kino.Markdown.new("**#{label}**")], boxed: true)
+end)
+|> Kino.Layout.grid(columns: 2)
 ```
 
 ## Pre-process the inputs
@@ -149,9 +172,7 @@ preprocess_image = fn image, target_dim ->
   cropped_image = Cv.Mat.roi(image, new_shape)
 
   %{
-    image:
-      cropped_image
-      |> Cv.cvtColor(Cv.Constant.cv_COLOR_RGB2BGR()),
+    image: cropped_image,
     tensor:
       cropped_image
       |> Cv.Mat.to_nx(Nx.BinaryBackend)
@@ -170,16 +191,15 @@ IO.puts(["Style Image Shape: ", inspect(preprocessed_style.tensor.shape)])
 IO.puts(["Content Image Shape: ", inspect(preprocessed_content.tensor.shape)])
 ```
 
-### Content image
-
 ```elixir
-preprocessed_content.image
-```
-
-### Style image
-
-```elixir
-preprocessed_style.image
+[
+  ["Content image preprocessed", preprocessed_content.image],
+  ["Style image preprocessed", preprocessed_style.image]
+]
+|> Enum.map(fn [label, img] ->
+  Kino.Layout.grid([img, Kino.Markdown.new("**#{label}**")], boxed: true)
+end)
+|> Kino.Layout.grid(columns: 2)
 ```
 
 ## Run style prediction
