@@ -1,12 +1,28 @@
 # Super resolution
 
 ```elixir
-Mix.install([
-  {:tflite_elixir, "0.3.0"},
-  {:evision, "0.1.29"},
-  {:kino, "~> 0.8.0"},
-  {:req, "~> 0.3.0"}
-])
+if Code.ensure_loaded?(Nerves.Runtime) do
+  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
+else
+  Mix.install([
+    {:tflite_elixir, "~> 0.3.0"},
+    {:evision, "0.1.31"},
+    {:req, "~> 0.3.0"},
+    {:kino, "~> 0.9.0"}
+  ])
+end
 ```
 
 ## Introduction
@@ -20,38 +36,9 @@ inference on the pretrained model.
 
 https://www.tensorflow.org/lite/examples/super_resolution/overview
 
-## Download data files
+<!-- livebook:{"break_markdown":true} -->
 
-* model using ESRGAN-TF2
-* test image from tensorflow examples
-
-```elixir
-downloads_dir = System.tmp_dir!()
-# for nerves demo user
-# change to a directory with write-permission
-# downloads_dir = "/data/livebook"
-
-download = fn url ->
-  save_as = Path.join(downloads_dir, URI.encode_www_form(url))
-
-  unless File.exists?(save_as) do
-    %{status: 200} = Req.get!(url, output: save_as)
-  end
-
-  save_as
-end
-
-data_files = %{
-  model:
-    "https://tfhub.dev/captain-pool/lite-model/esrgan-tf2/1?lite-format=tflite"
-    |> download.(),
-  test_img:
-    "https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg"
-    |> download.()
-}
-```
-
-## Alias modules
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
 
 ```elixir
 alias Evision, as: Cv
@@ -59,13 +46,55 @@ alias TFLiteElixir, as: TFLite
 alias TFLiteElixir.TFLiteTensor
 ```
 
+## Download data files
+
+* model using ESRGAN-TF2
+* test image from tensorflow examples
+
+```elixir
+# /data is the writable portion of a Nerves system
+downloads_dir =
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
+
+download = fn url ->
+  save_as = Path.join(downloads_dir, URI.encode_www_form(url))
+  unless File.exists?(save_as), do: Req.get!(url, output: save_as)
+  save_as
+end
+
+data_files =
+  [
+    model: "https://tfhub.dev/captain-pool/lite-model/esrgan-tf2/1?lite-format=tflite",
+    test_img:
+      "https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg"
+  ]
+  |> Enum.map(fn {key, url} -> {key, download.(url)} end)
+  |> Map.new()
+
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
+```
+
+```elixir
+test_image_input = Kino.Input.image(" ")
+```
+
 ## Generate a super resolution image using TensorFlow Lite
 
 ```elixir
+test_image_mat =
+  case Kino.Input.read(test_image_input) do
+    %{data: data, height: height, width: width} ->
+      Cv.Mat.from_binary(data, {:u, 8}, height, width, 3)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+
+    nil ->
+      Cv.imread(data_files.test_img)
+  end
+
 lr =
-  data_files.test_img
-  |> Cv.imread()
-  |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+  test_image_mat
   |> Cv.Mat.to_nx()
   |> Nx.new_axis(0)
   |> Nx.as_type({:f, 32})
@@ -98,13 +127,12 @@ sr =
 ## Visualize the result
 
 ```elixir
-data_files.test_img
-|> Cv.imread()
+[
+  ["Low resolution", test_image_mat],
+  ["High resolution", Cv.Mat.from_nx_2d(sr)]
+]
+|> Enum.map(fn [label, img] ->
+  Kino.Layout.grid([img, Kino.Markdown.new("**#{label}**")], boxed: true)
+end)
+|> Kino.Layout.grid(columns: 2)
 ```
-
-```elixir
-sr
-|> Cv.Mat.from_nx_2d()
-|> Cv.cvtColor(Cv.Constant.cv_COLOR_RGB2BGR())
-```
-
