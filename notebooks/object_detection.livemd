@@ -1,12 +1,28 @@
 # Object detection with TensorFlow Lite
 
 ```elixir
-Mix.install([
-  {:tflite_elixir, "0.3.0"},
-  {:evision, "0.1.29"},
-  {:kino, "~> 0.8.0"},
-  {:req, "~> 0.3.0"}
-])
+if Code.ensure_loaded?(Nerves.Runtime) do
+  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
+else
+  Mix.install([
+    {:tflite_elixir, "~> 0.3.0"},
+    {:evision, "0.1.31"},
+    {:req, "~> 0.3.0"},
+    {:kino, "~> 0.9.0"}
+  ])
+end
 ```
 
 ## Introduction
@@ -17,18 +33,22 @@ positions within the image.
 
 https://www.tensorflow.org/lite/examples/object_detection/overview
 
+<!-- livebook:{"break_markdown":true} -->
+
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
+
+```elixir
+alias Evision, as: Cv
+alias TFLiteElixir, as: TFLite
+alias TFLiteElixir.TFLiteTensor
+```
+
 ## Download data files
 
 ```elixir
-default_image_url = "https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg"
-input_image_url_input = Kino.Input.textarea("Image URL", default: default_image_url)
-```
-
-```elixir
-downloads_dir = System.tmp_dir!()
-# for nerves demo user
-# change to a directory with write-permission
-# downloads_dir = "/data/livebook"
+# /data is the writable portion of a Nerves system
+downloads_dir =
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -40,24 +60,21 @@ data_files =
   [
     model:
       "https://tfhub.dev/tensorflow/lite-model/efficientdet/lite4/detection/metadata/2?lite-format=tflite",
-    input_image: Kino.Input.read(input_image_url_input)
+    test_img: "https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg"
   ]
   |> Enum.map(fn {key, url} -> {key, download.(url)} end)
   |> Map.new()
-```
 
-## Alias modules
-
-```elixir
-alias Evision, as: Cv
-alias TFLiteElixir, as: TFLite
-alias TFLiteElixir.TFLiteTensor
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
 ```
 
 ## Load lables
 
 ```elixir
 model_buffer = File.read!(data_files.model)
+
 class_names =
   TFLite.FlatBufferModel.get_associated_file(model_buffer, "labelmap.txt")
   |> String.split("\n")
@@ -66,9 +83,21 @@ class_names =
 ## Load input image
 
 ```elixir
-input_image_mat =
-  data_files.input_image
-  |> Cv.imread()
+test_image_input = Kino.Input.image(" ")
+```
+
+```elixir
+test_image_mat =
+  case Kino.Input.read(test_image_input) do
+    %{data: data, height: height, width: width} ->
+      Cv.Mat.from_binary(data, {:u, 8}, height, width, 3)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+
+    nil ->
+      Cv.imread(data_files.test_img)
+  end
+
+:ok
 ```
 
 ## Preprocess image
@@ -79,12 +108,24 @@ input_image_mat =
 # Image data: ByteBuffer sized HEIGHT x WIDTH x 3,
 # where HEIGHT = 640 and WIDTH = 640 with values in [0, 255].
 # See https://tfhub.dev/tensorflow/lite-model/efficientdet/lite4/detection/default
-input_image_tensor =
-  input_image_mat
+test_image_resized_mat =
+  test_image_mat
   |> Cv.resize({640, 640})
+
+input_image_tensor =
+  test_image_resized_mat
   |> Cv.Mat.to_nx(Nx.BinaryBackend)
   |> Nx.new_axis(0)
   |> Nx.as_type({:u, 8})
+
+[
+  ["Input image", test_image_mat],
+  ["Preprocessed", test_image_resized_mat]
+]
+|> Enum.map(fn [label, img] ->
+  Kino.Layout.grid([img, Kino.Markdown.new("**#{label}**")], boxed: true)
+end)
+|> Kino.Layout.grid(columns: 2)
 ```
 
 ## Detect objects using TensorFlow Lite
@@ -127,10 +168,9 @@ detect_objects = fn interpreter, input_image_tensor, score_threshold ->
   end)
 end
 
-# Load TFLite model and allocate tensors
 {:ok, interpreter} = TFLite.Interpreter.new_from_buffer(model_buffer)
-
 prediction_results = detect_objects.(interpreter, input_image_tensor, 0.5)
+Kino.DataTable.new(prediction_results)
 ```
 
 ## Visualize predictions
@@ -143,10 +183,10 @@ prediction_results = detect_objects.(interpreter, input_image_tensor, 0.5)
 # Convert the object bounding box from relative coordinates to absolute
 # coordinates based on the original image resolution
 calc_prediction_box = fn {y_min, x_min, y_max, x_max} ->
-  x_min = trunc(x_min * img_width)
-  x_max = trunc(x_max * img_width)
-  y_min = trunc(y_min * img_height)
-  y_max = trunc(y_max * img_height)
+  x_min = round(x_min * img_width)
+  x_max = round(x_max * img_width)
+  y_min = round(y_min * img_height)
+  y_max = round(y_max * img_height)
 
   {x_min, y_max, x_max, y_min}
 end
@@ -154,7 +194,7 @@ end
 draw_result = fn %{class_id: class_id, score: score, box: box}, acc_mat ->
   {x_min, y_max, x_max, y_min} = calc_prediction_box.(box)
   class_name = Enum.at(class_names, class_id)
-  score_percent = trunc(score * 100)
+  score_percent = round(score * 100)
 
   box_start_point = {x_min, y_max}
   box_end_point = {x_max, y_min}

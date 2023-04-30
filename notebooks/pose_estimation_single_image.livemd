@@ -1,12 +1,28 @@
-# Human Pose Estimation with MoveNet and TensorFlow Lite - Single Image
+# Human pose estimation on single image
 
 ```elixir
-Mix.install([
-  {:tflite_elixir, "0.3.0"},
-  {:evision, "0.1.30"},
-  {:kino, "~> 0.8.0"},
-  {:req, "~> 0.3.0"}
-])
+if Code.ensure_loaded?(Nerves.Runtime) do
+  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
+else
+  Mix.install([
+    {:tflite_elixir, "~> 0.3.0"},
+    {:evision, "0.1.31"},
+    {:req, "~> 0.3.0"},
+    {:kino, "~> 0.9.0"}
+  ])
+end
 ```
 
 ## Introduction
@@ -22,18 +38,22 @@ https://www.tensorflow.org/lite/examples/pose_estimation/overview
 
 https://www.tensorflow.org/hub/tutorials/movenet
 
+<!-- livebook:{"break_markdown":true} -->
+
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
+
+```elixir
+alias Evision, as: Cv
+alias TFLiteElixir, as: TFLite
+alias TFLiteElixir.TFLiteTensor
+```
+
 ## Download data files
 
 ```elixir
-default_image_url = "https://images.pexels.com/photos/4384679/pexels-photo-4384679.jpeg"
-input_url_input = Kino.Input.textarea("Image URL", default: default_image_url)
-```
-
-```elixir
-downloads_dir = System.tmp_dir!()
-# for nerves demo user
-# change to a directory with write-permission
-# downloads_dir = "/data/livebook"
+# /data is the writable portion of a Nerves system
+downloads_dir =
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -45,21 +65,35 @@ data_files =
   [
     movenet_model:
       "https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/3?lite-format=tflite",
-    input_image: Kino.Input.read(input_url_input)
+    test_img: "https://images.pexels.com/photos/4384679/pexels-photo-4384679.jpeg"
   ]
   |> Enum.map(fn {key, url} -> {key, download.(url)} end)
   |> Map.new()
-```
 
-## Alias modules
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
+```
 
 ```elixir
-alias Evision, as: Cv
-alias TFLiteElixir, as: TFLite
-alias TFLiteElixir.TFLiteTensor
+test_image_input = Kino.Input.image(" ")
 ```
 
-## Load input image
+```elixir
+test_image_mat =
+  case Kino.Input.read(test_image_input) do
+    %{data: data, height: height, width: width} ->
+      Cv.Mat.from_binary(data, {:u, 8}, height, width, 3)
+      |> Cv.cvtColor(Cv.Constant.cv_COLOR_BGR2RGB())
+
+    nil ->
+      Cv.imread(data_files.test_img)
+  end
+
+:ok
+```
+
+## Preprocess input image
 
 * Input is a frame of video or an image, represented as an float32 tensor of
   shape: 256x256x3. Channels order is RGB with values in [0, 255].
@@ -87,18 +121,24 @@ resize_with_pad = fn %Cv.Mat{} = input_image_mat, desired_size when is_number(de
   )
 end
 
-input_image_mat =
-  data_files.input_image
-  |> Cv.imread()
+test_image_resized_mat =
+  test_image_mat
   |> resize_with_pad.(256)
 
 input_image_tensor =
-  input_image_mat
+  test_image_resized_mat
   |> Cv.Mat.to_nx(Nx.BinaryBackend)
   |> Nx.new_axis(0)
   |> Nx.as_type({:f, 32})
 
-input_image_mat
+[
+  ["Input image", test_image_mat],
+  ["Preprocessed", test_image_resized_mat]
+]
+|> Enum.map(fn [label, img] ->
+  Kino.Layout.grid([img, Kino.Markdown.new("**#{label}**")], boxed: true)
+end)
+|> Kino.Layout.grid(columns: 2)
 ```
 
 ## Run inference
@@ -128,9 +168,7 @@ keypoints_with_scores =
   |> Nx.reshape(output_shape)
 ```
 
-## Visualize the predictions with image
-
-### Calculate keypoints and keypoint edges
+## Visualize predictions
 
 ```elixir
 keypoint_names = [
@@ -205,10 +243,9 @@ keypoint_edges =
       end
   end
 
-:ok
+keypoints
+|> Kino.DataTable.new(name: "Keypoints")
 ```
-
-### Draw keypoints and keypoint edges
 
 ```elixir
 draw_keypoints = fn %Cv.Mat{} = input_image_mat, keypoints ->
@@ -216,7 +253,7 @@ draw_keypoints = fn %Cv.Mat{} = input_image_mat, keypoints ->
     acc_mat ->
       Cv.drawMarker(
         acc_mat,
-        {trunc(x), trunc(y)},
+        {round(x), round(y)},
         {0, 0, 255},
         markerSize: 10,
         thickness: 3
@@ -230,8 +267,8 @@ draw_keypoint_edges = fn %Cv.Mat{} = input_image_mat, edges ->
     acc_mat ->
       Cv.line(
         acc_mat,
-        {trunc(edge_start.x), trunc(edge_start.y)},
-        {trunc(edge_end.x), trunc(edge_end.y)},
+        {round(edge_start.x), round(edge_start.y)},
+        {round(edge_end.x), round(edge_end.y)},
         color,
         thickness: 3,
         lineType: 1
@@ -239,8 +276,7 @@ draw_keypoint_edges = fn %Cv.Mat{} = input_image_mat, edges ->
   end
 end
 
-data_files.input_image
-|> Cv.imread()
+test_image_mat
 |> resize_with_pad.(display_size)
 |> draw_keypoint_edges.(keypoint_edges)
 |> draw_keypoints.(keypoints)

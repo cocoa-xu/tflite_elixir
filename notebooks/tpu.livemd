@@ -3,10 +3,21 @@
 ```elixir
 if Code.ensure_loaded?(Nerves.Runtime) do
   IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
+  required_packages = [{:tflite_elixir, TFLiteElixir}]
+
+  for {pack, mod} <- required_packages do
+    if Code.ensure_loaded?(mod) do
+      {:ok, mod}
+    else
+      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
+      |> IO.puts()
+
+      {:error, mod}
+    end
+  end
 else
   Mix.install([
     {:tflite_elixir, "~> 0.3.0"},
-    {:nx, "~> 0.5.0"},
     {:req, "~> 0.3.0"},
     {:kino, "~> 0.9.0"}
   ])
@@ -19,46 +30,55 @@ The [Coral USB Accelerator](https://coral.ai/docs/accelerator/get-started) adds 
 
 ![](https://i.uwucocoa.moe/system/media_attachments/files/110/051/967/601/428/482/original/d095f799ba85fece.jpeg)
 
+<!-- livebook:{"break_markdown":true} -->
+
+It's useful to alias the module as something shorter when we make extensive use of the functions from certain modules.
+
+```elixir
+alias TFLiteElixir.Coral
+alias TFLiteElixir.FlatBufferModel
+alias TFLiteElixir.Interpreter
+alias TFLiteElixir.InterpreterBuilder
+alias TFLiteElixir.Ops
+alias TFLiteElixir.TFLiteTensor
+```
+
 ## Detect edge TPU devices
 
 ```elixir
-TFLiteElixir.Coral.edge_tpu_devices()
+Coral.edge_tpu_devices()
 ```
 
 ## Download data files
 
 ```elixir
+# /data is the writable portion of a Nerves system
 downloads_dir =
-  if Code.ensure_loaded?(Nerves.Runtime) do
-    "/data/livebook"
-  else
-    System.tmp_dir!()
-  end
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
 
 download = fn url ->
-  save_as = Path.join(downloads_dir, Path.basename(url))
-
-  unless File.exists?(save_as) do
-    %{status: 200} = Req.get!(url, output: Path.join(downloads_dir, Path.basename(url)))
-  end
-
+  save_as = Path.join(downloads_dir, URI.encode_www_form(url))
+  unless File.exists?(save_as), do: Req.get!(url, output: save_as)
   save_as
 end
 
-data_files = %{
-  class_labels:
-    "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/inat_bird_labels.txt"
-    |> download.(),
-  cpu_model:
-    "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/mobilenet_v2_1.0_224_inat_bird_quant.tflite"
-    |> download.(),
-  tpu_model:
-    "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/mobilenet_v2_1.0_224_inat_bird_quant_edgetpu.tflite"
-    |> download.(),
-  test_image:
-    "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/parrot.jpeg"
-    |> download.()
-}
+data_files =
+  [
+    class_labels:
+      "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/inat_bird_labels.txt",
+    cpu_model:
+      "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/mobilenet_v2_1.0_224_inat_bird_quant.tflite",
+    tpu_model:
+      "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/mobilenet_v2_1.0_224_inat_bird_quant_edgetpu.tflite",
+    test_image:
+      "https://raw.githubusercontent.com/cocoa-xu/tflite_elixir/main/test/test_data/parrot.jpeg"
+  ]
+  |> Enum.map(fn {key, url} -> {key, download.(url)} end)
+  |> Map.new()
+
+data_files
+|> Enum.map(fn {k, v} -> [name: k, location: v] end)
+|> Kino.DataTable.new(name: "Data files")
 ```
 
 ## Classify image
@@ -91,11 +111,6 @@ defmodule ClassifyImage do
   Code based on [classify_image.py](https://github.com/google-coral/pycoral/blob/master/examples/classify_image.py)
   """
 
-  alias TFLiteElixir.Interpreter
-  alias TFLiteElixir.InterpreterBuilder
-  alias TFLiteElixir.TFLiteTensor
-  alias TFLiteElixir.FlatBufferModel
-
   def run(args) do
     default_values = [
       top: 1,
@@ -123,7 +138,7 @@ defmodule ClassifyImage do
 
     tpu_context =
       if args[:use_tpu] do
-        TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
+        Coral.get_edge_tpu_context!(device: args[:tpu])
       else
         nil
       end
@@ -238,7 +253,7 @@ defmodule ClassifyImage do
   end
 
   defp make_interpreter(model, num_jobs, false, _tpu_context) do
-    resolver = TFLiteElixir.Ops.Builtin.BuiltinResolver.new!()
+    resolver = Ops.Builtin.BuiltinResolver.new!()
     builder = InterpreterBuilder.new!(model, resolver)
     interpreter = Interpreter.new!()
     InterpreterBuilder.set_num_threads!(builder, num_jobs)
@@ -248,7 +263,7 @@ defmodule ClassifyImage do
   end
 
   defp make_interpreter(model, _num_jobs, true, tpu_context) do
-    TFLiteElixir.Coral.make_edge_tpu_interpreter!(model, tpu_context)
+    Coral.make_edge_tpu_interpreter!(model, tpu_context)
   end
 
   defp get_scores(output_data, %TFLiteTensor{type: dtype = {:u, _}} = output_tensor) do
