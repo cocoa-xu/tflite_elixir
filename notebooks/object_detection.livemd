@@ -178,7 +178,7 @@ Kino.DataTable.new(prediction_results)
 * Draw the detection results on the original image
 
 ```elixir
-{img_height, img_width, _} = Cv.Mat.shape(input_image_mat)
+{img_height, img_width, _} = Cv.Mat.shape(test_image_mat)
 
 # Convert the object bounding box from relative coordinates to absolute
 # coordinates based on the original image resolution
@@ -222,7 +222,7 @@ draw_result = fn %{class_id: class_id, score: score, box: box}, acc_mat ->
   )
 end
 
-for prediction_result <- prediction_results, reduce: input_image_mat do
+for prediction_result <- prediction_results, reduce: test_image_mat do
   acc_mat -> draw_result.(prediction_result, acc_mat)
 end
 ```
