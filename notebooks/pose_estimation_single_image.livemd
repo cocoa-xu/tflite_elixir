@@ -1,28 +1,12 @@
 # Human pose estimation on single image
 
 ```elixir
-if Code.ensure_loaded?(Nerves.Runtime) do
-  IO.puts("Mix.install/2 is not supported on Nerves Livebook (yet!).")
-  required_packages = [{:evision, Evision}, {:tflite_elixir, TFLiteElixir}]
-
-  for {pack, mod} <- required_packages do
-    if Code.ensure_loaded?(mod) do
-      {:ok, mod}
-    else
-      "* #{pack} is required. Please add it to dependencies in your mix.exs file and rebuild firmware."
-      |> IO.puts()
-
-      {:error, mod}
-    end
-  end
-else
-  Mix.install([
-    {:tflite_elixir, "~> 0.3.0"},
-    {:evision, "0.1.31"},
-    {:req, "~> 0.3.0"},
-    {:kino, "~> 0.9.0"}
-  ])
-end
+Mix.install([
+  {:tflite_elixir, "~> 0.3.0"},
+  {:evision, "0.1.31"},
+  {:req, "~> 0.3.0"},
+  {:kino, "~> 0.9.0"}
+])
 ```
 
 ## Introduction
