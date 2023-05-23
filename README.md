@@ -4,7 +4,9 @@ TensorFlow Lite Elixir bindings with optional EdgeTPU support.
 
 For pure Erlang bindings, please see [cocoa-xu/tflite_beam](https://github.com/cocoa-xu/tflite_beam).
 
-## Try it in Livebook
+## Getting Started
+[![Run in Livebook](https://livebook.dev/badge/v1/gray.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fcocoa-xu%2Ftflite_elixir%2Fblob%2Fmain%2Fnotebooks%2Fimage_classification.livemd)
+
 A general workflow looks like this,
 
 ```elixir
@@ -21,9 +23,7 @@ input =
   |> StbImage.to_nx()
 
 [output_tensor_0] = TFLiteElixir.Interpreter.predict(interpreter, input)
-nx_tensor =
-  TFLiteElixir.TFLiteTensor.to_binary(output_tensor_0)
-  |> Nx.from_binary(:u8)
+indices_nx = Nx.flatten(output_tensor_0)
 
 # get top k predictions (numerical id of the class)
 # classes can be found in this file,
@@ -31,7 +31,7 @@ nx_tensor =
 # each line corresponds to a class
 # and the first line = id 0
 top_k = 5
-sorted_indices = Nx.argsort(nx_tensor, direction: :desc)
+sorted_indices = Nx.argsort(indices_nx, direction: :desc)
 top_k_indices = Nx.take(sorted_indices, Nx.iota({top_k}))
 top_k_preds = Nx.to_flat_list(top_k_indices)
 ```
@@ -40,14 +40,14 @@ And there is an experimental `ImageClassification` module that does everything f
 
 ```elixir
 iex> alias TFLiteElixir.ImageClassification
-iex> {:ok, pid} = ImageClassification.start("test/test_data/mobilenet_v2_1.0_224_inat_bird_quant.tflite")
-iex> ImageClassification.predict(pid, "test/test_data/parrot.jpeg")
+iex> {:ok, pid} = ImageClassification.start("/path/to/mobilenet_v2_1.0_224_inat_bird_quant.tflite")
+iex> ImageClassification.predict(pid, "/path/to/parrot.jpeg")
 %{class_id: 923, score: 0.70703125}
 iex> ImageClassification.set_label_from_associated_file(pid, "inat_bird_labels.txt")
 :ok
-iex> ImageClassification.predict(pid, "test/test_data/parrot.jpeg")
+iex> ImageClassification.predict(pid, "/path/to/parrot.jpeg")
 %{class_id: 923, label: "Ara macao (Scarlet Macaw)", score: 0.70703125}
-iex> ImageClassification.predict(pid, "test/test_data/parrot.jpeg", top_k: 3)
+iex> ImageClassification.predict(pid, "/path/to/parrot.jpeg", top_k: 3)
 [
   %{class_id: 923, label: "Ara macao (Scarlet Macaw)", score: 0.70703125},
   %{
@@ -289,8 +289,7 @@ bash "3rd_party/cache/${TFLITE_BEAM_CORAL_LIBEDGETPU_RUNTIME}/edgetpu_runtime/in
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `tflite_elixir` to your list of dependencies in `mix.exs`:
+Add `:tflite_elixir` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -300,7 +299,4 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/tflite_elixir>.
-
+Documentation can be found at <https://hexdocs.pm/tflite_elixir>.
