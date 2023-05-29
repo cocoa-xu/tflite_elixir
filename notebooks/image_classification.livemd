@@ -88,10 +88,7 @@ labels_file = Path.join(downloads_dir, "inat_bird_labels.txt")
 Utils.download!(labels_url, output: labels_file)
 IO.puts("Labels saved to #{labels_file}")
 
-label_lookup =
-  File.read!(labels_file)
-  |> String.split("\n", trim: true)
-  |> List.to_tuple()
+labels = File.read!(labels_file) |> String.split("\n", trim: true)
 ```
 
 ## Choose image to be classified
@@ -140,6 +137,8 @@ input_image_resized =
 [output_tensor_0] = Interpreter.predict(interpreter, input_image_resized)
 indices_nx = Nx.flatten(output_tensor_0)
 
+label_lookup = List.to_tuple(labels)
+
 indices_nx
 |> Nx.argsort(direction: :desc)
 |> Nx.take(Nx.iota({how_many_results}))
@@ -153,15 +152,19 @@ indices_nx
 There is an experimental `ImageClassification` module that does everything for
 you. It supports both CPU and TPU, and it will show more information, including
 scores (confidence) and the class name of the predicted results. It's also more
-flexible where you can adjust different parameters like top_k and threshold
+flexible where you can adjust different parameters like `top_k` and `threshold`
 (for confidence) and etc.
 
 ```elixir
 alias TFLiteElixir.ImageClassification
 
 {:ok, pid} = ImageClassification.start(model_file)
-ImageClassification.set_label_from_associated_file(pid, labels_file)
-
-ImageClassification.predict(pid, input_image_nx, top_k: 3)
-|> Kino.DataTable.new(name: "Inference results")
+ImageClassification.set_label(pid, labels)
+results = ImageClassification.predict(pid, input_image_nx, top_k: 3)
+Kino.DataTable.new(results, name: "Inference results")
 ```
+
+Some models have labels emdedded as [associated
+files](https://www.tensorflow.org/lite/models/convert/metadata#read_the_associated_files_from_models).
+If that is the case, we can load label with
+[`ImageClassification.set_label_from_associated_file/2`](https://hexdocs.pm/tflite_elixir/TFLiteElixir.ImageClassification.html#set_label_from_associated_file/2).
