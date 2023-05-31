@@ -24,6 +24,12 @@ Apply any styles on an input image to create a new artistic image.
 
 [![Run in Livebook](https://livebook.dev/badge/v1/gray.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fcocoa-xu%2Ftflite_elixir%2Fblob%2Fmain%2Fnotebooks%2Fartistic_style_transfer.livemd)
 
+## BERT Question and Answer
+
+BERT model can be used to build a system that can answer users’ questions in natural language.
+
+[![Run in Livebook](https://livebook.dev/badge/v1/gray.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fcocoa-xu%2Ftflite_elixir%2Fblob%2Fmain%2Fnotebooks%2Fmobilebert.livemd)
+
 ## Object detection
 
 Detect multiple objects with bounding boxes. Yes, dogs and cats too.
