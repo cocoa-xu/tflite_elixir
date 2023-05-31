@@ -77,7 +77,7 @@ defmodule TFLiteElixir.MobileBert do
     end_logits = Nx.squeeze(TFLiteTensor.to_nx(self.tensors.end_logits))
     start_logits = Nx.squeeze(TFLiteTensor.to_nx(self.tensors.start_logits))
 
-    postprocessing(self, start_logits, end_logits, content_data)
+    postprocessing(start_logits, end_logits, content_data)
   end
 
   defp preprocessing(vocab_map, query, content) do
@@ -150,7 +150,7 @@ defmodule TFLiteElixir.MobileBert do
     }
   end
 
-  defp postprocessing(self = %T{}, start_logits, end_logits, content_data) do
+  defp postprocessing(start_logits, end_logits, content_data) do
     start_indexes = candidate_answer_indexes(start_logits)
     end_indexes = candidate_answer_indexes(end_logits)
 
