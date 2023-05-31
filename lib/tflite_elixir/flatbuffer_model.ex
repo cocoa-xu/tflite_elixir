@@ -33,13 +33,16 @@ defmodule TFLiteElixir.FlatBufferModel do
   def build_from_file(filename, opts \\ []) when is_binary(filename) and is_list(opts) do
     error_reporter = ErrorReporter.from_struct(opts[:error_reporter])
 
-    case :tflite_beam_flatbuffer_model.build_from_file(filename, [{:error_reporter, error_reporter}]) do
+    case :tflite_beam_flatbuffer_model.build_from_file(filename, [
+           {:error_reporter, error_reporter}
+         ]) do
       {:tflite_beam_flatbuffer_model, initialized, minimum_runtime, ref} ->
         %T{
           initialized: initialized,
           minimum_runtime: minimum_runtime,
           model: ref
         }
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -64,15 +67,19 @@ defmodule TFLiteElixir.FlatBufferModel do
   def verify_and_build_from_file(filename, opts \\ []) do
     error_reporter = ErrorReporter.from_struct(opts[:error_reporter])
 
-    case :tflite_beam_flatbuffer_model.verify_and_build_from_file(filename, [{:error_reporter, error_reporter}]) do
+    case :tflite_beam_flatbuffer_model.verify_and_build_from_file(filename, [
+           {:error_reporter, error_reporter}
+         ]) do
       {:tflite_beam_flatbuffer_model, initialized, minimum_runtime, ref} ->
         %T{
           initialized: initialized,
           minimum_runtime: minimum_runtime,
           model: ref
         }
+
       :invalid ->
         :invalid
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -87,13 +94,16 @@ defmodule TFLiteElixir.FlatBufferModel do
   def build_from_buffer(buffer, opts \\ []) when is_binary(buffer) and is_list(opts) do
     error_reporter = ErrorReporter.from_struct(opts[:error_reporter])
 
-    case :tflite_beam_flatbuffer_model.build_from_buffer(buffer, [{:error_reporter, error_reporter}]) do
+    case :tflite_beam_flatbuffer_model.build_from_buffer(buffer, [
+           {:error_reporter, error_reporter}
+         ]) do
       {:tflite_beam_flatbuffer_model, initialized, minimum_runtime, ref} ->
         %T{
           initialized: initialized,
           minimum_runtime: minimum_runtime,
           model: ref
         }
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -115,6 +125,7 @@ defmodule TFLiteElixir.FlatBufferModel do
     case :tflite_beam_flatbuffer_model.error_reporter(self) do
       {:tflite_beam_error_reporter, ref} when is_reference(ref) ->
         %ErrorReporter{ref: ref}
+
       {:error, error} ->
         {:error, error}
     end
@@ -157,8 +168,10 @@ defmodule TFLiteElixir.FlatBufferModel do
   @doc """
   Get associated file(s) from a FlatBuffer model
   """
-  @spec get_associated_file(binary(), [String.t()] | String.t()) :: %{String.t() => String.t()} | String.t() | nif_error()
-  def get_associated_file(buffer, filename) when is_binary(buffer) and (is_list(filename) or is_binary(filename)) do
+  @spec get_associated_file(binary(), [String.t()] | String.t()) ::
+          %{String.t() => String.t()} | String.t() | nif_error()
+  def get_associated_file(buffer, filename)
+      when is_binary(buffer) and (is_list(filename) or is_binary(filename)) do
     :tflite_beam_flatbuffer_model.get_associated_file(buffer, filename)
   end
 

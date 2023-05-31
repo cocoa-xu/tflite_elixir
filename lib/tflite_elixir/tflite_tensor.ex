@@ -86,6 +86,7 @@ defmodule TFLiteElixir.TFLiteTensor do
           zero_point: zero_point,
           quantized_dimension: quantized_dimension
         }
+
       {:error, error} ->
         {:error, error}
     end

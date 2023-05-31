@@ -10,12 +10,16 @@ defmodule TFLiteElixir.ImageClassification.Test do
     {:ok, pid} = ImageClassification.start(filename)
     %{class_id: 923, score: 0.70703125} = ImageClassification.predict(pid, input_path)
 
-    %{class_id: 923, score: 0.70703125} = ImageClassification.predict(pid, StbImage.read_file!(input_path))
+    %{class_id: 923, score: 0.70703125} =
+      ImageClassification.predict(pid, StbImage.read_file!(input_path))
 
-    %{class_id: 923, score: 0.70703125} = ImageClassification.predict(pid, StbImage.to_nx(StbImage.read_file!(input_path)))
+    %{class_id: 923, score: 0.70703125} =
+      ImageClassification.predict(pid, StbImage.to_nx(StbImage.read_file!(input_path)))
 
     assert :ok == ImageClassification.set_label_from_associated_file(pid, "inat_bird_labels.txt")
-    %{class_id: 923, label: "Ara macao (Scarlet Macaw)", score: 0.70703125} = ImageClassification.predict(pid, input_path)
+
+    %{class_id: 923, label: "Ara macao (Scarlet Macaw)", score: 0.70703125} =
+      ImageClassification.predict(pid, input_path)
 
     [
       %{class_id: 923, label: "Ara macao (Scarlet Macaw)", score: 0.70703125},

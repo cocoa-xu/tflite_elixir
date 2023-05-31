@@ -40,7 +40,8 @@ defmodule TFLiteElixir.ImageClassification do
   end
 
   @spec set_label_from_associated_file(pid(), String.t()) :: :ok | {:error, String.t()}
-  def set_label_from_associated_file(pid, associated_filename) when is_binary(associated_filename) do
+  def set_label_from_associated_file(pid, associated_filename)
+      when is_binary(associated_filename) do
     GenServer.call(pid, {:set_label, :associated_file, associated_filename})
   end
 
@@ -77,16 +78,21 @@ defmodule TFLiteElixir.ImageClassification do
     interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
     :ok = Interpreter.allocate_tensors(interpreter)
 
-    {:ok, %{
-      model_path: model_path,
-      interpreter: interpreter,
-      opts: args,
-      labels: nil
-    }}
+    {:ok,
+     %{
+       model_path: model_path,
+       interpreter: interpreter,
+       opts: args,
+       labels: nil
+     }}
   end
 
   @impl true
-  def handle_call({:predict, {input_type, input_data}, pred_opts}, _from, state=%{interpreter: interpreter, opts: opts, labels: labels}) do
+  def handle_call(
+        {:predict, {input_type, input_data}, pred_opts},
+        _from,
+        state = %{interpreter: interpreter, opts: opts, labels: labels}
+      ) do
     [input_tensor_number | _] = Interpreter.inputs!(interpreter)
     [output_tensor_number | _] = Interpreter.outputs!(interpreter)
     %TFLiteTensor{} = input_tensor = Interpreter.tensor(interpreter, input_tensor_number)
@@ -113,8 +119,10 @@ defmodule TFLiteElixir.ImageClassification do
       case input_type do
         :image_path ->
           load_input(input_data)
+
         :stb_image ->
           input_data
+
         :nx_tensor ->
           StbImage.from_nx(input_data)
       end
@@ -191,11 +199,20 @@ defmodule TFLiteElixir.ImageClassification do
   end
 
   @impl true
-  def handle_call({:set_label, :associated_file, associated_filename}, _from, state=%{model_path: model_path}) when is_binary(associated_filename) do
-    case TFLiteElixir.FlatBufferModel.get_associated_file(File.read!(model_path), associated_filename) do
+  def handle_call(
+        {:set_label, :associated_file, associated_filename},
+        _from,
+        state = %{model_path: model_path}
+      )
+      when is_binary(associated_filename) do
+    case TFLiteElixir.FlatBufferModel.get_associated_file(
+           File.read!(model_path),
+           associated_filename
+         ) do
       content when is_binary(content) ->
         labels = String.split(content, "\n")
         {:reply, :ok, %{state | labels: labels}}
+
       error ->
         {:reply, error, state}
     end

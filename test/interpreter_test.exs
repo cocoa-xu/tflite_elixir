@@ -248,7 +248,11 @@ defmodule TFLiteElixir.Interpreter.Test do
     [output_data] = :tflite_beam_interpreter.predict(interpreter, [input_data])
     assert expected_out == output_data
 
-    [output_data] = :tflite_beam_interpreter.predict(interpreter, %{"map/TensorArrayStack/TensorArrayGatherV3" => input_data})
+    [output_data] =
+      :tflite_beam_interpreter.predict(interpreter, %{
+        "map/TensorArrayStack/TensorArrayGatherV3" => input_data
+      })
+
     assert expected_out == output_data
 
     error = :tflite_beam_interpreter.predict(interpreter, ["", ""])

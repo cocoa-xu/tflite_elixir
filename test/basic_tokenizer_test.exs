@@ -20,6 +20,7 @@ defmodule TFLiteElixir.Tokenizer.BasicTokenizer.Test do
   end
 
   test "basic tokenizer, with format characters" do
-    assert ["Hello", "World", "!"] == BasicTokenizer.tokenize("Hello World!" <> <<0x0600::utf8>>, false)
+    assert ["Hello", "World", "!"] ==
+             BasicTokenizer.tokenize("Hello World!" <> <<0x0600::utf8>>, false)
   end
 end

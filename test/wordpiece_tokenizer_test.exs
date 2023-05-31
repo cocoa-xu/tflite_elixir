@@ -8,7 +8,7 @@ defmodule TFLiteElixir.Tokenizer.WordpieceTokenizer.Test do
     "world" => 1,
     "una" => 2,
     "##ffa" => 3,
-    "##ble" => 4,
+    "##ble" => 4
   }
 
   defp mini_vocab, do: @mini_vocab

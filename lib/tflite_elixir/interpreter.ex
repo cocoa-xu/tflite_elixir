@@ -182,8 +182,9 @@ defmodule TFLiteElixir.Interpreter do
   @spec tensor(reference(), non_neg_integer()) :: %TFLiteTensor{} | nif_error()
   def tensor(self, tensor_index) when is_reference(self) and tensor_index >= 0 do
     case :tflite_beam_interpreter.tensor(self, tensor_index) do
-      {:tflite_beam_tensor, name, index, shape, shape_signature, type, {:tflite_beam_quantization_params, scale, zero_point, quantized_dimension},
-           sparsity_params, ref} ->
+      {:tflite_beam_tensor, name, index, shape, shape_signature, type,
+       {:tflite_beam_quantization_params, scale, zero_point, quantized_dimension},
+       sparsity_params, ref} ->
         %TFLiteTensor{
           name: name,
           index: index,
@@ -198,6 +199,7 @@ defmodule TFLiteElixir.Interpreter do
           sparsity_params: sparsity_params,
           reference: ref
         }
+
       {:error, error} ->
         {:error, error}
     end
@@ -308,7 +310,8 @@ defmodule TFLiteElixir.Interpreter do
   Fill input data to corresponding input tensor of the interpreter,
   call `Interpreter.invoke` and return output tensor(s)
   """
-  @spec predict(reference(), binary() | [binary()] | map()) :: binary() | [binary()] | map() | nif_error()
+  @spec predict(reference(), binary() | [binary()] | map()) ::
+          binary() | [binary()] | map() | nif_error()
   def predict(interpreter, input) do
     with {:ok, input_tensors} <- Interpreter.inputs(interpreter),
          {:ok, output_tensors} <- Interpreter.outputs(interpreter),

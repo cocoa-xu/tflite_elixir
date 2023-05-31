@@ -9,7 +9,8 @@ defmodule TFLiteElixir.Tokenizer.FullTokenizer do
   End-to-end tokenization.
   """
   @spec tokenize(String.t(), boolean(), map()) :: [String.t()]
-  def tokenize(text, is_case_insensitive, vocab) when is_binary(text) and is_boolean(is_case_insensitive) and is_map(vocab) do
+  def tokenize(text, is_case_insensitive, vocab)
+      when is_binary(text) and is_boolean(is_case_insensitive) and is_map(vocab) do
     :tflite_beam_full_tokenizer.tokenize(text, is_case_insensitive, vocab)
   end
 

@@ -22,21 +22,27 @@ defmodule TFLiteElixir.Tokenizer.FullTokenizer.Test do
   defp mini_vocab, do: @mini_vocab
 
   test "full tokenizer, case insensetive" do
-    assert ["hello", "world", "!", "hi", ",", "there", "!", "!", "!", "[UNK]"] == FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", true, mini_vocab())
+    assert ["hello", "world", "!", "hi", ",", "there", "!", "!", "!", "[UNK]"] ==
+             FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", true, mini_vocab())
   end
 
   test "full tokenizer, case sensetive" do
-    assert ["Hello", "World", "!", "Hi", ",", "there", "!", "!", "!", "[UNK]"] == FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", false, mini_vocab())
+    assert ["Hello", "World", "!", "Hi", ",", "there", "!", "!", "!", "[UNK]"] ==
+             FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", false, mini_vocab())
   end
 
   test "full tokenizer, case insensetive, convert to id" do
     tokens = FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", true, mini_vocab())
-    assert {:ok, [0, 1, 7, 5, 8, 6, 7, 7, 7, 1000]} == FullTokenizer.convert_to_id(tokens, mini_vocab())
+
+    assert {:ok, [0, 1, 7, 5, 8, 6, 7, 7, 7, 1000]} ==
+             FullTokenizer.convert_to_id(tokens, mini_vocab())
   end
 
   test "full tokenizer, case sensetive, convert to id" do
     tokens = FullTokenizer.tokenize("Hello World! Hi,there!!!Nonexistent", false, mini_vocab())
-    assert {:ok, [9, 10, 7, 11, 8, 6, 7, 7, 7, 1000]} == FullTokenizer.convert_to_id(tokens, mini_vocab())
+
+    assert {:ok, [9, 10, 7, 11, 8, 6, 7, 7, 7, 1000]} ==
+             FullTokenizer.convert_to_id(tokens, mini_vocab())
   end
 
   test "full tokenizer, token not in vocab" do
