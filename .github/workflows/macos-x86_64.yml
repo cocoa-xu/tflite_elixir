@@ -38,7 +38,7 @@ jobs:
           path: ./cache/otp
           key: ${{ runner.os }}-otp-${{ env.OTP_VERSION }}
       - name: Download OTP
-        if : ${{ steps.cache-otp.outputs.cache-hit != 'true' }}
+        if: steps.cache-otp.outputs.cache-hit != 'true'
         run: |
           mkdir -p ./cache/otp
           curl -fSL https://cocoa.build/otp/v${{ env.OTP_VERSION }}/otp-x86_64-apple-darwin.tar.gz -o ./cache/otp/otp-v${{ env.OTP_VERSION }}-x86_64-apple-darwin.tar.gz
@@ -51,7 +51,7 @@ jobs:
           path: ./cache/elixir
           key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}
       - name: Download and Compile Elixir
-        if : ${{ steps.cache-elixir.outputs.cache-hit != 'true' }}
+        if: steps.cache-elixir.outputs.cache-hit != 'true'
         run: |
           export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
           export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
