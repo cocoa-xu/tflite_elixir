@@ -26,19 +26,50 @@ jobs:
     env:
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
+      OTP_VERSION: "26.2.1"
+      ELIXIR_VERSION: "1.15.7"
 
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Install Erlang and Elixir
+      - name: Cache OTP
+        uses: actions/cache@v2
+        id: cache-otp
+        with:
+          path: ./cache/otp
+          key: ${{ runner.os }}-otp-${{ env.OTP_VERSION }}
+      - name: Download OTP
+        if : ${{ steps.cache-otp.outputs.cache-hit != 'true' }}
         run: |
-          brew install erlang
-          brew install elixir
+          mkdir -p ./cache/otp
+          curl -fSL https://cocoa.build/otp/v${{ env.OTP_VERSION }}/otp-x86_64-apple-darwin.tar.gz -o ./cache/otp/otp-v${{ env.OTP_VERSION }}-x86_64-apple-darwin.tar.gz
+          cd ./cache/otp
+          tar -xzf otp-v${{ env.OTP_VERSION }}-x86_64-apple-darwin.tar.gz
+      - name: Cache Elixir
+        id: cache-elixir
+        uses: actions/cache@v2
+        with:
+          path: ./cache/elixir
+          key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}
+      - name: Download and Compile Elixir
+        if : ${{ steps.cache-elixir.outputs.cache-hit != 'true' }}
+        run: |
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
+          mkdir -p ./cache/elixir
+          curl -fSL https://github.com/elixir-lang/elixir/archive/refs/tags/v${{ env.ELIXIR_VERSION }}.tar.gz -o ./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}.tar.gz
+          cd ./cache/elixir
+          tar -xzf elixir-${{ env.ELIXIR_VERSION }}.tar.gz
+          cd elixir-${{ env.ELIXIR_VERSION }}
+          make -j$(sysctl -n hw.ncpu) install
+      - name: Install Mix and Rebar
+        run: |
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
           mix local.hex --force
           mix local.rebar --force
-          brew install autoconf automake
-
       - name: Compile and Test
         run: |
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
           mix deps.get
           mix test
