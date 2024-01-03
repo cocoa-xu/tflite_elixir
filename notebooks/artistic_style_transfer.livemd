@@ -46,7 +46,7 @@ Download the content and style images, and the pre-trained TensorFlow Lite model
 ```elixir
 # /data is the writable portion of a Nerves system
 downloads_dir =
-  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: File.cwd!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -219,14 +219,13 @@ run_style_transform = fn <<_::binary>> = style_bottleneck_data,
   # Load the model.
   {:ok, interpreter} = TFLite.Interpreter.new(data_files.style_transform)
 
-  # Get input and output tensors.
-  {:ok, _input_tensors} = TFLite.Interpreter.inputs(interpreter)
-  {:ok, output_tensors} = TFLite.Interpreter.outputs(interpreter)
-
   # Run the model.
   TFLite.Interpreter.input_tensor(interpreter, 0, preprocessed_content_data)
   TFLite.Interpreter.input_tensor(interpreter, 1, style_bottleneck_data)
   TFLite.Interpreter.invoke(interpreter)
+
+  # Get output tensors.
+  {:ok, output_tensors} = TFLite.Interpreter.outputs(interpreter)
 
   # Transform content image.
   out_tensor = TFLite.Interpreter.tensor(interpreter, Enum.at(output_tensors, 0))
@@ -279,4 +278,16 @@ run_style_transform.(
   Nx.to_binary(style_bottleneck_blended),
   Nx.to_binary(preprocessed_content.tensor)
 )
+```
+
+```elixir
+img = Cv.imread("/Users/cocoa/Downloads/cat.jpg")
+```
+
+```elixir
+[b, g, r] = Cv.split(img)
+```
+
+```elixir
+g
 ```

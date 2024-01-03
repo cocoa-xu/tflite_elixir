@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   # will download and install precompiled version
-  {:tflite_elixir, "~> 0.3.0"},
+  {:tflite_elixir, "~> 0.3.4"},
   {:req, "~> 0.3.0"},
   {:progress_bar, "~> 2.0.0"},
   {:kino, "~> 0.9.0"}
@@ -63,7 +63,7 @@ end
 downloads_dir =
   if Code.ensure_loaded?(Nerves.Runtime),
     do: "/data/tmp",
-    else: System.tmp_dir!()
+    else: File.cwd!()
 ```
 
 ## Download pre-trained model
@@ -73,7 +73,7 @@ model_url =
   "https://raw.githubusercontent.com/google-coral/test_data/master/mobilenet_v2_1.0_224_inat_bird_quant.tflite"
 
 model_file = Path.join(downloads_dir, "mobilenet_v2_1.0_224_inat_bird_quant.tflite")
-Utils.download!(model_url, output: model_file)
+unless File.exists?(model_file), do: Utils.download!(model_url, output: model_file)
 IO.puts("Model saved to #{model_file}")
 ```
 
@@ -85,7 +85,7 @@ labels_url =
   "https://raw.githubusercontent.com/google-coral/test_data/master/inat_bird_labels.txt"
 
 labels_file = Path.join(downloads_dir, "inat_bird_labels.txt")
-Utils.download!(labels_url, output: labels_file)
+unless File.exists?(labels_file), do: Utils.download!(labels_url, output: labels_file)
 IO.puts("Labels saved to #{labels_file}")
 
 labels = File.read!(labels_file) |> String.split("\n", trim: true)

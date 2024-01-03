@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:tflite_elixir, "~> 0.3.0"},
+  {:tflite_elixir, "~> 0.3.4"},
   {:evision, "0.1.31"},
   {:req, "~> 0.3.0"},
   {:kino, "~> 0.9.0"}
@@ -32,7 +32,7 @@ alias TFLiteElixir.TFLiteTensor
 ```elixir
 # /data is the writable portion of a Nerves system
 downloads_dir =
-  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: System.tmp_dir!()
+  if Code.ensure_loaded?(Nerves.Runtime), do: "/data/livebook", else: File.cwd!()
 
 download = fn url ->
   save_as = Path.join(downloads_dir, URI.encode_www_form(url))
@@ -54,7 +54,7 @@ data_files
 |> Kino.DataTable.new(name: "Data files")
 ```
 
-## Load lables
+## Load labels
 
 ```elixir
 model_buffer = File.read!(data_files.model)
