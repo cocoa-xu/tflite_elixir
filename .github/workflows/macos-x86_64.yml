@@ -65,14 +65,14 @@ jobs:
           ls -lah
       - name: Install Elixir
         run: |
-          export PATH=$(pwd)/./cache/otp/otp-${{ env.OTP_VERSION }}/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
           export ERL_ROOTDIR=$(pwd)/./cache/otp/otp-${{ env.OTP_VERSION }}/usr/local/lib/erlang
           cd ./cache/elixir
           mix local.hex --force
           mix local.rebar --force
       - name: Compile and Test
         run: |
-          export PATH=$(pwd)/./cache/otp/otp-${{ env.OTP_VERSION }}/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
           export ERL_ROOTDIR=$(pwd)/./cache/otp/otp-${{ env.OTP_VERSION }}/usr/local/lib/erlang
           mix deps.get
           mix test
