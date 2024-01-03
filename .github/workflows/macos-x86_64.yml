@@ -37,8 +37,6 @@ jobs:
         with:
           path: ./cache/otp
           key: ${{ runner.os }}-otp-${{ env.OTP_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-otp-
       - name: Download OTP
         if : ${{ steps.cache-otp.outputs.cache-hit != 'true' }}
         run: |
@@ -52,17 +50,15 @@ jobs:
         with:
           path: ./cache/elixir
           key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-elixir-
       - name: Download and Compile Elixir
         if : ${{ steps.cache-elixir.outputs.cache-hit != 'true' }}
         run: |
+          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
+          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
           mkdir -p ./cache/elixir
           curl -fSL https://github.com/elixir-lang/elixir/archive/refs/tags/v${{ env.ELIXIR_VERSION }}.tar.gz -o ./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}.tar.gz
           cd ./cache/elixir
           tar -xzf elixir-${{ env.ELIXIR_VERSION }}.tar.gz
-          export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
-          export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
           cd elixir-${{ env.ELIXIR_VERSION }}
           make -j$(sysctl -n hw.ncpu) install
       - name: Install Mix and Rebar
