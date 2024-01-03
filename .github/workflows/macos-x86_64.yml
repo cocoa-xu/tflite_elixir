@@ -63,7 +63,7 @@ jobs:
           tar -xzf elixir-${{ env.ELIXIR_VERSION }}.tar.gz
           export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
           export ERL_ROOTDIR=$(pwd)/./cache/otp/usr/local/lib/erlang
-          cd .elixir-${{ env.ELIXIR_VERSION }}
+          cd elixir-${{ env.ELIXIR_VERSION }}
           make -j$(sysctl -n hw.ncpu) install
       - name: Install Mix and Rebar
         run: |
