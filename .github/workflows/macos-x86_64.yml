@@ -62,7 +62,7 @@ jobs:
           cd ./cache/elixir
           tar -xzf elixir-${{ env.ELIXIR_VERSION }}.tar.gz
           cd elixir-${{ env.ELIXIR_VERSION }}
-          make -j$(nproc) install
+          make -j$(sysctl -n hw.ncpu) install
       - name: Install Elixir
         run: |
           export PATH=$(pwd)/./cache/otp/usr/local/bin:$(pwd)/./cache/elixir/elixir-${{ env.ELIXIR_VERSION }}/bin:${PATH}
