@@ -110,8 +110,8 @@ jobs:
           cd nerves_livebook
           git checkout "${NERVES_LIVEBOOK_VER}"
 
-          LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
-          head -n "${LINE}" mix.exs > mix.exs.tmp
+          LINE="$(grep -n 'tflite_elixir' mix.exs | awk -F: '{print $1+1}')"
+          head -n "$(($LINE-2))" mix.exs > mix.exs.tmp
           echo '      {:tflite_elixir, "~> 0.3", path: "../tflite_elixir"},' >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
@@ -190,8 +190,8 @@ jobs:
           cd nerves_livebook
           git checkout "${NERVES_LIVEBOOK_VER}"
 
-          LINE="$(grep -n 'toolshed' mix.exs | awk -F: '{print $1+1}')"
-          head -n "${LINE}" mix.exs > mix.exs.tmp
+          LINE="$(grep -n 'tflite_elixir' mix.exs | awk -F: '{print $1+1}')"
+          head -n "$(($LINE-2))" mix.exs > mix.exs.tmp
           echo '      {:tflite_elixir, "~> 0.3", path: "../tflite_elixir"},' >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
