@@ -25,14 +25,14 @@ defmodule TFLiteElixir.MixProject do
     ]
   end
 
-defp deps do
-  [
-    {:tflite_beam, "~> 0.3.3"},
-    {:nx, "~> 0.5"},
-    {:stb_image, "~> 0.6"},
-    {:ex_doc, "~> 0.27", only: :docs, runtime: false}
-  ]
-end
+  defp deps do
+    [
+      {:tflite_beam, "~> 0.3.4"},
+      {:nx, "~> 0.5"},
+      {:stb_image, "~> 0.6"},
+      {:ex_doc, "~> 0.27", only: :docs, runtime: false}
+    ]
+  end
 
   defp description() do
     "TensorFlow Lite Elixir binding with optional TPU support."
