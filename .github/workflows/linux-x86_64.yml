@@ -32,12 +32,12 @@ jobs:
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26"
-          elixir-version: "1.15"
+          elixir-version: "1.16"
 
       - name: Install system dependecies
         run: |
