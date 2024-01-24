@@ -27,7 +27,7 @@ jobs:
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
       OTP_VERSION: "26.2.1"
-      ELIXIR_VERSION: "1.16"
+      ELIXIR_VERSION: "1.16.0"
 
     steps:
       - uses: actions/checkout@v4
