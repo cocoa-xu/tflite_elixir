@@ -85,6 +85,7 @@ defmodule TFLiteElixir.MobileBert do
     content_words = String.split(content)
 
     content_tokens = Enum.map(content_words, &FullTokenizer.tokenize(&1, true, vocab_map))
+
     content_token_idx_to_word_idx_mapping =
       for {token, i} <- Enum.with_index(content_tokens), reduce: [] do
         acc ->
@@ -196,7 +197,7 @@ defmodule TFLiteElixir.MobileBert do
 
   defp excerpt_words(content_data, start_idx, end_idx) do
     pattern =
-      Enum.slice(content_data.content_words, start_idx..end_idx-1)
+      Enum.slice(content_data.content_words, start_idx..(end_idx - 1))
       |> Enum.map(&Regex.escape/1)
       |> Enum.join("\\s+")
 
