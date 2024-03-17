@@ -24,8 +24,8 @@ defmodule TFLiteElixir.Test.ClassifyImage do
 
     """
     -------RESULTS--------
-    Ara macao (Scarlet Macaw): 0.70703
-    Platycercus elegans (Crimson Rosella): 0.07813
+    Ara macao (Scarlet Macaw): 0.73828
+    Platycercus elegans (Crimson Rosella): 0.06641
     Coracias caudatus (Lilac-breasted Roller): 0.01953
     """ =
       String.split(output, "\n")
