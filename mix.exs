@@ -3,7 +3,7 @@ defmodule TFLiteElixir.MixProject do
   require Logger
 
   @app :tflite_elixir
-  @version "0.3.6"
+  @version "0.3.7"
   @github_url "https://github.com/cocoa-xu/tflite_elixir"
 
   def project do
@@ -27,7 +27,7 @@ defmodule TFLiteElixir.MixProject do
 
   defp deps do
     [
-      {:tflite_beam, "~> 0.3.5"},
+      {:tflite_beam, "~> 0.3.6"},
       {:nx, "~> 0.5"},
       {:stb_image, "~> 0.6"},
       {:ex_doc, "~> 0.27", only: :docs, runtime: false}
