@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   mix_test:
-    runs-on: macos-11
+    runs-on: macos-12
     env:
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
