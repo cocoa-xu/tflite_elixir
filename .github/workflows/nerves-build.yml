@@ -57,6 +57,9 @@ jobs:
       matrix:
         include:
           - pair:
+              target: rpi0_2
+              libedgetpu_library: aarch64
+          - pair:
               target: rpi5
               libedgetpu_library: aarch64
           - pair:
