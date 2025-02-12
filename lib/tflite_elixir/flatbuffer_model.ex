@@ -3,7 +3,6 @@ defmodule TFLiteElixir.FlatBufferModel do
   An RAII object that represents a read-only tflite model, copied from disk, or
   mmapped.
   """
-  import TFLiteElixir.Errorize
 
   alias TFLiteElixir.ErrorReporter
 
@@ -48,7 +47,13 @@ defmodule TFLiteElixir.FlatBufferModel do
     end
   end
 
-  deferror(build_from_file(filename, opts))
+  def build_from_file!(filename, opts) do
+    case build_from_file(filename, opts) do
+      {:error, message} when is_list(message) -> raise List.to_string(message)
+      {:error, message} when is_binary(message) -> raise message
+      res -> res
+    end
+  end
 
   @doc """
   Verifies whether the content of the file is legit, then builds a model

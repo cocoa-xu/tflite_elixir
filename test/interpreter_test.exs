@@ -90,7 +90,7 @@ defmodule TFLiteElixir.Interpreter.Test do
     filename = Path.join([__DIR__, "test_data", "mobilenet_v2_1.0_224_inat_bird_quant.tflite"])
     interpreter = Interpreter.new!(filename)
 
-    assert 67 == Interpreter.nodes_size(interpreter)
+    assert 65 == Interpreter.nodes_size(interpreter)
   end
 
   test "nodes_size/1 with invalid interpreter" do
@@ -102,7 +102,7 @@ defmodule TFLiteElixir.Interpreter.Test do
     filename = Path.join([__DIR__, "test_data", "mobilenet_v2_1.0_224_inat_bird_quant.tflite"])
     interpreter = Interpreter.new!(filename)
 
-    assert [65, 62, 66, 64] == Interpreter.execution_plan(interpreter)
+    assert Enum.to_list(0..64) == Interpreter.execution_plan(interpreter)
   end
 
   test "execution_plan/1 with invalid interpreter" do

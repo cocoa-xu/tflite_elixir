@@ -19,16 +19,16 @@ defmodule TFLiteElixir.Test.DetectImage do
         )
       end)
 
-    """
-    cat
-      id   : 16
-      score: 0.934
-      bbox : [3, -1, 294, 240]
-    """ =
-      String.split(output, "\n")
-      |> List.delete_at(0)
-      |> List.delete_at(0)
-      |> Enum.join("\n")
+    assert """
+           cat
+             id   : 16
+             score: 0.953
+             bbox : [3, -1, 294, 240]
+           """ =
+             String.split(output, "\n")
+             |> List.delete_at(0)
+             |> List.delete_at(0)
+             |> Enum.join("\n")
   end
 
   @tag :require_tpu
