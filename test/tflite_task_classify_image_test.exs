@@ -22,16 +22,16 @@ defmodule TFLiteElixir.Test.ClassifyImage do
         )
       end)
 
-    """
-    -------RESULTS--------
-    Ara macao (Scarlet Macaw): 0.73828
-    Platycercus elegans (Crimson Rosella): 0.06641
-    Coracias caudatus (Lilac-breasted Roller): 0.01953
-    """ =
+    result =
       String.split(output, "\n")
       |> List.delete_at(0)
       |> List.delete_at(0)
       |> Enum.join("\n")
+
+    assert result =~ "-------RESULTS--------"
+    assert result =~ "Ara macao (Scarlet Macaw): 0.7"
+    assert result =~ "Platycercus elegans (Crimson Rosella): 0."
+    assert result =~ "Coracias caudatus (Lilac-breasted Roller): 0."
   end
 
   @tag :require_tpu

@@ -48,9 +48,10 @@ jobs:
     env:
       MIX_ENV: prod
       NERVES_PROJ_NAME: nerves_tflite
-      NERVES_LIVEBOOK_VER: "v0.14.0"
+      NERVES_LIVEBOOK_VER: "v0.14.2"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
       TFLITE_BEAM_CORAL_SUPPORT: "true"
+      FWUP_VERSION: "1.12.0"
 
     strategy:
       fail-fast: false
@@ -94,7 +95,8 @@ jobs:
               libedgetpu_library: armv7l
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
         with:
@@ -109,8 +111,8 @@ jobs:
           mix local.hex --force
           mix local.rebar --force
           mix archive.install hex nerves_bootstrap --force
-          wget -k https://github.com/fwup-home/fwup/releases/download/v1.11.0/fwup_1.11.0_amd64.deb -O fwup_1.11.0_amd64.deb
-          sudo dpkg -i fwup_1.11.0_amd64.deb
+          curl -fSL "https://github.com/fwup-home/fwup/releases/download/v${FWUP_VERSION}/fwup_${FWUP_VERSION}_amd64.deb" -o "fwup_${FWUP_VERSION}_amd64.deb"
+          sudo dpkg -i "fwup_${FWUP_VERSION}_amd64.deb"
 
       - name: Make a nerves project
         run: |
@@ -138,12 +140,12 @@ jobs:
           cp "./_build/${MIX_TARGET}_${MIX_ENV}/nerves/images/nerves_livebook.fw" "/tmp/firmware/${NERVES_PROJ_NAME}_${{ matrix.pair.target }}_${MIX_ENV}.fw"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.NERVES_PROJ_NAME }}_${{ matrix.pair.target }}_${{ env.MIX_ENV }}.fw
           path: /tmp/firmware/${{ env.NERVES_PROJ_NAME }}_${{ matrix.pair.target }}_${{ env.MIX_ENV }}.fw
       
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: /tmp/firmware/${{ env.NERVES_PROJ_NAME }}_${{ matrix.pair.target }}_${{ env.MIX_ENV }}.fw
