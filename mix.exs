@@ -1,6 +1,5 @@
 defmodule TFLiteElixir.MixProject do
   use Mix.Project
-  require Logger
 
   @app :tflite_elixir
   @version "0.3.9"
