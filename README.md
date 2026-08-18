@@ -4,6 +4,8 @@ TensorFlow Lite Elixir bindings with optional EdgeTPU support.
 
 For pure Erlang bindings, please see [cocoa-xu/tflite_beam](https://github.com/cocoa-xu/tflite_beam).
 
+[![Hex.pm](https://img.shields.io/hexpm/v/tflite_elixir.svg?style=flat&color=blue)](https://hex.pm/packages/tflite_elixir)
+
 ## Getting Started
 [![Run in Livebook](https://livebook.dev/badge/v1/gray.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fcocoa-xu%2Ftflite_elixir%2Fblob%2Fmain%2Fnotebooks%2Fimage_classification.livemd)
 
