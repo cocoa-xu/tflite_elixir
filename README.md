@@ -14,7 +14,7 @@ A general workflow looks like this,
 ```elixir
 # will download and install precompiled version
 Mix.install([
-  {:tflite_elixir, "~> 0.3.0"}
+  {:tflite_elixir, "~> 0.3"}
 ])
 
 # parrot.jpeg and the tflite file can be found in the test/test_data directory
@@ -296,7 +296,7 @@ Add `:tflite_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "~> 0.3.0"}
+    {:tflite_elixir, "~> 0.3"}
   ]
 end
 ```
