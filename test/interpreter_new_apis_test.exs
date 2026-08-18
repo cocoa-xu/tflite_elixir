@@ -80,6 +80,19 @@ defmodule TFLiteElixir.Interpreter.NewAPIs.Test do
     assert -1 == Interpreter.get_subgraph_index_from_signature!(interpreter, "nope")
   end
 
+  test "get_signature_defs/1 reports what a model declares" do
+    # this model declares none, and nil is how that is reported
+    assert nil == Interpreter.get_signature_defs!(interpreter())
+  end
+
+  test "TFLiteTensor.shape/1 agrees with the tensor's dims" do
+    interpreter = interpreter()
+    :ok = Interpreter.allocate_tensors(interpreter)
+    tensor = Interpreter.tensor(interpreter, 0)
+
+    assert {1, 224, 224, 3} == TFLiteElixir.TFLiteTensor.shape(tensor)
+  end
+
   test "verify_and_build_from_buffer/2 checks the buffer first" do
     model = FlatBufferModel.verify_and_build_from_buffer(File.read!(@model))
     assert %FlatBufferModel{initialized: true} = model

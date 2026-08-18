@@ -60,6 +60,39 @@ defmodule TFLiteElixir.SignatureRunner.Test do
     assert {:error, _} = SignatureRunner.output_tensor(runner, "nope")
   end
 
+  test "resizing an input by name" do
+    runner = runner()
+    :ok = SignatureRunner.allocate_tensors(runner)
+
+    assert :ok == SignatureRunner.resize_input_tensor(runner, @in_name, [2, 224, 224, 3])
+    :ok = SignatureRunner.allocate_tensors(runner)
+
+    # the input now takes two images worth of data
+    two = :binary.copy(File.read!(@input_path), 2)
+    assert :ok == SignatureRunner.input_tensor(runner, @in_name, two)
+    assert :ok == SignatureRunner.invoke(runner)
+  end
+
+  test "the strict form refuses a dimension the model fixed" do
+    runner = runner()
+    :ok = SignatureRunner.allocate_tensors(runner)
+
+    assert {:error, _} =
+             SignatureRunner.resize_input_tensor_strict(runner, @in_name, [4, 224, 224, 3])
+  end
+
+  test "resizing an unknown input is an error" do
+    runner = runner()
+    :ok = SignatureRunner.allocate_tensors(runner)
+
+    assert {:error, _} = SignatureRunner.resize_input_tensor(runner, "nope", [1])
+  end
+
+  test "cancelling without the interpreter allowing it is an error" do
+    # cancellation has to be enabled on the interpreter the runner came from
+    assert {:error, _} = SignatureRunner.cancel(runner())
+  end
+
   test "a runner keeps its interpreter alive" do
     input = File.read!(@input_path)
     golden = File.read!(@golden_path)
