@@ -45,13 +45,15 @@ permissions:
 jobs:
   mix-firmware:
     runs-on: ubuntu-latest
+    container: hexpm/elixir:1.20.2-erlang-29.0.2-ubuntu-resolute-20260610
     env:
       MIX_ENV: prod
       NERVES_PROJ_NAME: nerves_tflite
-      NERVES_LIVEBOOK_VER: "v0.19.2"
+      NERVES_LIVEBOOK_VER: "v0.19.5"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       FWUP_VERSION: "1.16.0"
+      DEBIAN_FRONTEND: noninteractive
 
     strategy:
       fail-fast: false
@@ -84,35 +86,21 @@ jobs:
           - pair:
               target: bbb
               libedgetpu_library: armv7l
-          - pair:
-              target: osd32mp1
-              libedgetpu_library: armv7l
-          - pair:
-              target: npi_imx6ull
-              libedgetpu_library: armv7l
-          - pair:
-              target: grisp2
-              libedgetpu_library: armv7l
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - uses: erlef/setup-beam@v1
-        with:
-          otp-version: "29"
-          elixir-version: "1.20"
-
       - name: Install nerves and system dependecies
         run: |
           mkdir -p ~/.ssh
           echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCulZpVE/JdpWX53C35n45RSIMtaIIiTMnmRo5oDEMbyh0NnKI5byikkOvGnGLOO2KTlq4We+MF5iKx72B1Ixl8RY7L6Kc/h3R6jG4uOWBhw/WBhIebteJVYDzrlU8fHTewquWYT6tJ7v7g54Qe5vofsDeKBDqTJqJPlwNSxP8AjPZ0vQ4O4IhG0CXaDzU/G50sqzquKckgGWURLN9LcsA+kzciKJRhKw4Q7kpOiTNG/fzYxBpgpNrnyyr7bhj0jdOsg9KoG57aLSqbmEVCOyWa6yh6lOTp37S6ijBfQORxUu3I+6B04zUBSEvN4wgqslHU9pbIio8Szz1vbnlqsgO0tG1yqALfs6RVSjW81AujKefeH/8seE7q0yiHJXkE4tejIcewJT+2e6p/fP2pVSwyRqZ1bObtRUCMG3Pwdi0IpfsyBSa02Qc7eT9VB1WN7XD1vpfMDQ/nIWmoA40VkX3F3v5Mht5PZwVmlRyM8BrLtCYTreUP5xl6ZZCSX2IfOI8= nerves-ci-build' > ~/.ssh/id_rsa.pub
-          sudo apt-get update && sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git libssl-dev libncurses5-dev python3 ca-certificates squashfs-tools ssh-askpass libmnl-dev
+          apt-get update && apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl wget file jq xdelta3 git libssl-dev libncurses5-dev python3 ca-certificates squashfs-tools ssh-askpass libmnl-dev libnl-genl-3-dev
           mix local.hex --force
           mix local.rebar --force
           mix archive.install hex nerves_bootstrap --force
           curl -fSL "https://github.com/fwup-home/fwup/releases/download/v${FWUP_VERSION}/fwup_${FWUP_VERSION}_amd64.deb" -o "fwup_${FWUP_VERSION}_amd64.deb"
-          sudo dpkg -i "fwup_${FWUP_VERSION}_amd64.deb"
+          dpkg -i "fwup_${FWUP_VERSION}_amd64.deb"
 
       - name: Make a nerves project
         run: |
