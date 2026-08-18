@@ -65,6 +65,23 @@ iex> ImageClassification.predict(pid, "/path/to/parrot.jpeg", top_k: 3)
 ]
 ```
 
+There is an experimental `ObjectDetection` module in the same shape. It also supports both CPU and TPU, and returns one entry per detection with its class id, score, label and bounding box, `[ymin, xmin, ymax, xmax]`, in the coordinates of the image you gave it.
+
+```elixir
+iex> alias TFLiteElixir.ObjectDetection
+iex> {:ok, pid} = ObjectDetection.start("/path/to/ssd_mobilenet_v2_coco_quant_postprocess.tflite")
+iex> ObjectDetection.predict(pid, "/path/to/cat.jpeg")
+[%{class_id: 16, label: nil, score: 0.93359375, bbox: [3, -1, 294, 240]}]
+iex> ObjectDetection.set_label(pid, "/path/to/coco_labels.txt")
+:ok
+iex> ObjectDetection.predict(pid, "/path/to/cat.jpeg")
+[%{class_id: 16, label: "cat", score: 0.93359375, bbox: [3, -1, 294, 240]}]
+iex> ObjectDetection.predict(pid, "/path/to/cat.jpeg", threshold: 0.99)
+[]
+```
+
+To run it on a Coral device, start it with `use_tpu: true` and an Edge TPU model.
+
 ## Nerves Support
 
 ### Prebuilt firmware (Experimental)
