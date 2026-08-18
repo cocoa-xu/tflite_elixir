@@ -86,15 +86,6 @@ jobs:
           - pair:
               target: bbb
               libedgetpu_library: armv7l
-          - pair:
-              target: osd32mp1
-              libedgetpu_library: armv7l
-          - pair:
-              target: npi_imx6ull
-              libedgetpu_library: armv7l
-          - pair:
-              target: grisp2
-              libedgetpu_library: armv7l
 
     steps:
       - name: Checkout
