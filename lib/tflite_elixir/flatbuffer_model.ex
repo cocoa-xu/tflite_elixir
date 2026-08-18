@@ -115,6 +115,33 @@ defmodule TFLiteElixir.FlatBufferModel do
   end
 
   @doc """
+  Verify whether the buffer is a legit flatbuffer, then build a model from it
+
+  Returns `:invalid` if the buffer does not verify. Note that `buffer` will be copied.
+  """
+  @spec verify_and_build_from_buffer(binary(), Keyword.t()) :: %T{} | :invalid | nif_error()
+  def verify_and_build_from_buffer(buffer, opts \\ []) when is_binary(buffer) and is_list(opts) do
+    error_reporter = ErrorReporter.from_struct(opts[:error_reporter])
+
+    case :tflite_beam_flatbuffer_model.verify_and_build_from_buffer(buffer, [
+           {:error_reporter, error_reporter}
+         ]) do
+      {:tflite_beam_flatbuffer_model, initialized, minimum_runtime, ref} ->
+        %T{
+          initialized: initialized,
+          minimum_runtime: minimum_runtime,
+          model: ref
+        }
+
+      :invalid ->
+        :invalid
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
   Check whether current model has been initialized
   """
   @spec initialized(%T{}) :: bool() | nif_error()

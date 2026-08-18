@@ -307,6 +307,158 @@ defmodule TFLiteElixir.Interpreter do
   deferror(get_signature_defs(self))
 
   @doc """
+  Get a runner for one of the model's signatures.
+
+  Pass `nil` for the primary subgraph: the first signature that points at it, or a
+  placeholder one when the model declares no signatures at all, so this works with
+  older exports too.
+
+  The runner keeps this interpreter alive. See `TFLiteElixir.SignatureRunner`.
+  """
+  @spec get_signature_runner(reference(), String.t() | nil) :: nif_resource_ok() | nif_error()
+  def get_signature_runner(self, signature_key)
+      when is_reference(self) and (is_binary(signature_key) or is_nil(signature_key)) do
+    :tflite_beam_interpreter.get_signature_runner(self, signature_key)
+  end
+
+  deferror(get_signature_runner(self, signature_key))
+
+  @doc """
+  The inputs of the named signature, as a map of name to tensor index.
+
+  An empty map is returned for a key the model does not declare.
+  """
+  @spec signature_inputs(reference(), String.t()) :: {:ok, map()} | nif_error()
+  def signature_inputs(self, signature_key)
+      when is_reference(self) and is_binary(signature_key) do
+    :tflite_beam_interpreter.signature_inputs(self, signature_key)
+  end
+
+  deferror(signature_inputs(self, signature_key))
+
+  @doc """
+  The outputs of the named signature, as a map of name to tensor index.
+
+  An empty map is returned for a key the model does not declare.
+  """
+  @spec signature_outputs(reference(), String.t()) :: {:ok, map()} | nif_error()
+  def signature_outputs(self, signature_key)
+      when is_reference(self) and is_binary(signature_key) do
+    :tflite_beam_interpreter.signature_outputs(self, signature_key)
+  end
+
+  deferror(signature_outputs(self, signature_key))
+
+  @doc """
+  The subgraph a signature belongs to, or `-1` for a key the model does not declare.
+  """
+  @spec get_subgraph_index_from_signature(reference(), String.t()) ::
+          {:ok, integer()} | nif_error()
+  def get_subgraph_index_from_signature(self, signature_key)
+      when is_reference(self) and is_binary(signature_key) do
+    :tflite_beam_interpreter.get_subgraph_index_from_signature(self, signature_key)
+  end
+
+  deferror(get_subgraph_index_from_signature(self, signature_key))
+
+  @doc """
+  Change the dimensionality of a given input tensor.
+
+  Only inputs can be resized, and `allocate_tensors/1` has to be called again
+  afterwards.
+  """
+  @spec resize_input_tensor(reference(), integer(), [integer()]) :: :ok | nif_error()
+  def resize_input_tensor(self, tensor_index, dims)
+      when is_reference(self) and is_integer(tensor_index) and is_list(dims) do
+    :tflite_beam_interpreter.resize_input_tensor(self, tensor_index, dims)
+  end
+
+  @doc """
+  Change the dimensionality of a given input tensor, keeping the rank fixed.
+
+  Unlike `resize_input_tensor/3` this only accepts dimensions the model left unknown,
+  so a tensor whose shape is fully fixed cannot be resized.
+  """
+  @spec resize_input_tensor_strict(reference(), integer(), [integer()]) :: :ok | nif_error()
+  def resize_input_tensor_strict(self, tensor_index, dims)
+      when is_reference(self) and is_integer(tensor_index) and is_list(dims) do
+    :tflite_beam_interpreter.resize_input_tensor_strict(self, tensor_index, dims)
+  end
+
+  @doc """
+  Allow a running `invoke/1` to be cancelled.
+
+  Has to be called before invoking. Without it `cancel/1` is an error.
+  """
+  @spec enable_cancellation(reference()) :: :ok | nif_error()
+  def enable_cancellation(self) when is_reference(self) do
+    :tflite_beam_interpreter.enable_cancellation(self)
+  end
+
+  @doc """
+  Ask an in-flight `invoke/1` to stop.
+
+  Does not block and is safe to call from another process, which is the point: an
+  invocation occupies a dirty scheduler and cannot otherwise be interrupted. Later
+  invocations are unaffected. Requires `enable_cancellation/1`.
+  """
+  @spec cancel(reference()) :: :ok | nif_error()
+  def cancel(self) when is_reference(self) do
+    :tflite_beam_interpreter.cancel(self)
+  end
+
+  @doc """
+  Release memory that is only needed while invoking.
+
+  Invoking again reallocates it, so this trades time for memory on devices short of
+  the latter.
+  """
+  @spec release_non_persistent_memory(reference()) :: :ok | nif_error()
+  def release_non_persistent_memory(self) when is_reference(self) do
+    :tflite_beam_interpreter.release_non_persistent_memory(self)
+  end
+
+  @doc """
+  Reset all variable tensors to zero.
+  """
+  @spec reset_variable_tensors(reference()) :: :ok | nif_error()
+  def reset_variable_tensors(self) when is_reference(self) do
+    :tflite_beam_interpreter.reset_variable_tensors(self)
+  end
+
+  @doc """
+  How many subgraphs the model has.
+  """
+  @spec subgraphs_size(reference()) :: {:ok, non_neg_integer()} | nif_error()
+  def subgraphs_size(self) when is_reference(self) do
+    :tflite_beam_interpreter.subgraphs_size(self)
+  end
+
+  deferror(subgraphs_size(self))
+
+  @doc """
+  Whether float32 operations may be carried out in float16.
+  """
+  @spec get_allow_fp16_precision_for_fp32(reference()) :: {:ok, boolean()} | nif_error()
+  def get_allow_fp16_precision_for_fp32(self) when is_reference(self) do
+    :tflite_beam_interpreter.get_allow_fp16_precision_for_fp32(self)
+  end
+
+  deferror(get_allow_fp16_precision_for_fp32(self))
+
+  @doc """
+  Allow or forbid carrying out float32 operations in float16.
+
+  Only has an effect on backends that can do it, and has to be set before the graph is
+  prepared.
+  """
+  @spec set_allow_fp16_precision_for_fp32(reference(), boolean()) :: :ok | nif_error()
+  def set_allow_fp16_precision_for_fp32(self, allow)
+      when is_reference(self) and is_boolean(allow) do
+    :tflite_beam_interpreter.set_allow_fp16_precision_for_fp32(self, allow)
+  end
+
+  @doc """
   Fill input data to corresponding input tensor of the interpreter,
   call `Interpreter.invoke` and return output tensor(s)
   """

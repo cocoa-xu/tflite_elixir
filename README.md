@@ -82,6 +82,25 @@ iex> ObjectDetection.predict(pid, "/path/to/cat.jpeg", threshold: 0.99)
 
 To run it on a Coral device, start it with `use_tpu: true` and an Edge TPU model.
 
+
+### Signatures
+
+A model exported with signatures names its inputs and outputs, so neither side has to
+depend on the order the tensors happen to be listed in.
+
+```elixir
+iex> alias TFLiteElixir.{Interpreter, SignatureRunner}
+iex> {:ok, runner} = Interpreter.get_signature_runner(interpreter, "serving_default")
+iex> SignatureRunner.input_names!(runner)
+["input_1"]
+iex> {:ok, outputs} = SignatureRunner.predict(runner, %{"input_1" => input_data})
+iex> Map.keys(outputs)
+["output_1"]
+```
+
+Passing `nil` instead of a key asks for the primary subgraph, which also works for
+models that declare no signatures at all.
+
 ## Nerves Support
 
 ### Prebuilt firmware (Experimental)
