@@ -88,12 +88,59 @@ defmodule TFLiteElixir.Coral do
       Under the assumption above, the same index N will always point to the same
       device.
   """
+  @spec get_edge_tpu_context() :: {:ok, reference()} | {:error, String.t()}
+  def get_edge_tpu_context do
+    get_edge_tpu_context([])
+  end
+
+  deferror(get_edge_tpu_context())
+
+  @doc """
+  Returns a TPU context, or an error tuple if the requested one is not available.
+  See `get_edge_tpu_context/0` for the options.
+  """
   @spec get_edge_tpu_context(Keyword.t()) :: {:ok, reference()} | {:error, String.t()}
-  def get_edge_tpu_context(opts \\ []) do
+  def get_edge_tpu_context(opts) when is_list(opts) do
     :tflite_beam_coral.get_edge_tpu_context(opts)
   end
 
   deferror(get_edge_tpu_context(opts))
+
+  @doc """
+  An Edge TPU delegate over the bundled runtime, with its defaults.
+  """
+  @spec edge_tpu_delegate() :: {:ok, reference()} | {:error, String.t()}
+  def edge_tpu_delegate do
+    edge_tpu_delegate([])
+  end
+
+  deferror(edge_tpu_delegate())
+
+  @doc """
+  An Edge TPU delegate, for attaching to an interpreter builder like any other.
+
+  libedgetpu is itself a TfLite delegate plugin, so this is
+  `TFLiteElixir.Delegate.external/2` pointed at it -- which means an Edge TPU
+  interpreter can be built through the ordinary builder, composed with
+  `TFLiteElixir.InterpreterBuilder.set_num_threads/2` and with other delegates.
+  `make_edge_tpu_interpreter/2` builds its own interpreter internally and so
+  reaches none of that; it keeps working and is unchanged.
+
+  ##### Options
+  - `:lib_path`. Where libedgetpu is. Defaults to the copy bundled in
+    `tflite_beam`'s `priv/libedgetpu`, so a build made without Coral support can
+    still reach a TPU by naming a runtime installed elsewhere.
+
+  Everything else is passed to the plugin as-is: `device`, `"Performance"`,
+  `"Usb.AlwaysDfu"` and `"Usb.MaxBulkInQueueLength"`, whose values mean what
+  `get_edge_tpu_context/1` says they mean.
+  """
+  @spec edge_tpu_delegate(Keyword.t() | map()) :: {:ok, reference()} | {:error, String.t()}
+  def edge_tpu_delegate(opts) when is_list(opts) or is_map(opts) do
+    :tflite_beam_coral.edge_tpu_delegate(as_map(opts))
+  end
+
+  deferror(edge_tpu_delegate(opts))
 
   @doc """
   Creates a new interpreter instance for an Edge TPU model.
@@ -133,4 +180,7 @@ defmodule TFLiteElixir.Coral do
   def dequantize_tensor(interpreter, tensor_index, as_type \\ nil) do
     :tflite_beam_coral.dequantize_tensor(interpreter, tensor_index, as_type)
   end
+
+  defp as_map(opts) when is_map(opts), do: opts
+  defp as_map(opts) when is_list(opts), do: Map.new(opts)
 end

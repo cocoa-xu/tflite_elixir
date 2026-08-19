@@ -177,8 +177,32 @@ defmodule TFLiteElixir.Ops.Builtin.BuiltinResolver do
   """
   @spec new() :: nif_resource_ok() | nif_error()
   def new() do
-    :tflite_beam_ops_builtin_builtin_resolver.new()
+    new([])
   end
 
   deferror(new())
+
+  @doc """
+  New built-in op resolver, choosing whether TfLite may apply its own delegates.
+
+  ##### Options
+  - `:apply_default_delegates`. Whether the interpreter is handed the delegates
+    TfLite applies by itself -- XNNPACK, in practice -- which it does lazily,
+    inside `TFLiteElixir.Interpreter.allocate_tensors/1`.
+
+    Defaults to `false`, and `TFLiteElixir.InterpreterBuilder.build/2` then
+    attaches an XNNPACK delegate explicitly instead, so the same acceleration
+    happens where it can be seen and configured. Passing `true` restores the
+    older arrangement: TfLite delegates invisibly at allocate time and the
+    builder adds nothing of its own.
+  """
+  @spec new(Keyword.t() | map()) :: nif_resource_ok() | nif_error()
+  def new(opts) when is_list(opts) or is_map(opts) do
+    :tflite_beam_ops_builtin_builtin_resolver.new(as_map(opts))
+  end
+
+  deferror(new(opts))
+
+  defp as_map(opts) when is_map(opts), do: opts
+  defp as_map(opts) when is_list(opts), do: Map.new(opts)
 end

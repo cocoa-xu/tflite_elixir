@@ -266,7 +266,58 @@ output_data
 |> then(&Enum.at(labels, &1))
 ```
 
+## Delegates
+
+`TFLiteElixir.InterpreterBuilder.build/2` attaches an XNNPACK delegate for you,
+unless you have attached one yourself. TfLite would otherwise apply XNNPACK on its
+own, invisibly, inside `allocate_tensors/1` -- with a thread count nothing could
+reach and no way to decline it. The acceleration is the same; where it happens is
+now visible.
+
+```elixir
+alias TFLiteElixir.{Delegate, InterpreterBuilder}
+
+{:ok, delegate} = Delegate.xnnpack(num_threads: 4)
+:ok = InterpreterBuilder.add_delegate!(builder, delegate)
+```
+
+`Delegate.available/0` lists what this build can create: `:xnnpack` on every target
+except armv6 and armv7l, and `:external` everywhere.
+
+To hand delegation back to TfLite, ask the resolver for it:
+
+```elixir
+resolver = TFLiteElixir.Ops.Builtin.BuiltinResolver.new!(apply_default_delegates: true)
+```
+
+Anything implementing TfLite's delegate plugin interface can be loaded at runtime,
+which covers a GPU delegate built elsewhere and any vendor delegate:
+
+```elixir
+{:ok, delegate} =
+  Delegate.external("/opt/lib/libvendor_delegate.so", device: 0, precision: :fp16)
+```
+
+A delegate must outlive every interpreter built from the builder it was added to,
+so there is no way to detach or free one: the builder and each interpreter hold it
+for as long as they need it. An interpreter, and any delegate attached to it,
+belongs to one process at a time.
+
 ## Coral Support
+
+An Edge TPU is reachable as a delegate too, which puts it on the ordinary builder
+path -- composable with `set_num_threads/2` and with anything else attached:
+
+```elixir
+{:ok, delegate} = TFLiteElixir.Coral.edge_tpu_delegate()
+:ok = TFLiteElixir.InterpreterBuilder.add_delegate!(builder, delegate)
+```
+
+`TFLiteElixir.Coral.make_edge_tpu_interpreter/2` still works and is unchanged. It
+builds its own interpreter internally, though, so nothing set on a builder reaches
+it. Both routes produce identical output; asking for a device that is not attached
+is an ordinary `{:error, reason}`.
+
 ### Dependencies
 For macOS
 ```shell
