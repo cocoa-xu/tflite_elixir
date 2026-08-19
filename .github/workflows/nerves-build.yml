@@ -111,7 +111,10 @@ jobs:
 
           LINE="$(grep -n 'tflite_elixir' mix.exs | awk -F: '{print $1+1}')"
           head -n "$(($LINE-2))" mix.exs > mix.exs.tmp
-          echo '      {:tflite_elixir, "~> 0.3", path: "../tflite_elixir"},' >> mix.exs.tmp
+          # no version requirement: this injects the checkout being tested, and a
+          # requirement here goes stale on every release -- "~> 0.3" already did,
+          # since it does not match a 0.4.0-rc pre-release at all
+          echo '      {:tflite_elixir, path: "../tflite_elixir"},' >> mix.exs.tmp
           tail -n "+${LINE}" mix.exs >> mix.exs.tmp
           mv mix.exs.tmp mix.exs
           cat mix.exs
