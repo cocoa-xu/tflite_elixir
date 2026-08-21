@@ -239,8 +239,6 @@ defmodule TFLiteElixir.ImageClassification do
     end
   end
 
-  defp load_labels(nil), do: nil
-
   defp load_labels(label_file_path) do
     File.read!(label_file_path)
     |> String.split("\n")

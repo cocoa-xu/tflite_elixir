@@ -521,9 +521,6 @@ defmodule TFLiteElixir.Interpreter do
       {:match_shape, tensor_shape, input_shape, _} ->
         {:error,
          "input data shape, #{inspect(input_shape)}, does not match the shape type of the tensor, #{inspect(tensor_shape)}, tensor index: #{input_tensor_index}"}
-
-      error ->
-        error
     end
   end
 
