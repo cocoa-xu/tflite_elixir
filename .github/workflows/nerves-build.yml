@@ -140,3 +140,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: /tmp/firmware/${{ env.NERVES_PROJ_NAME }}_${{ matrix.pair.target }}_${{ env.MIX_ENV }}.fw
+          # Without this every tag publishes as a full release and takes over
+          # "Latest", so /releases/latest answered with a release candidate
+          # while the README told people to install the stable one.
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
