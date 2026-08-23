@@ -55,7 +55,11 @@ defmodule TFLiteElixir.Interpreter.Server.Test do
 
   test "run/2 covers what predict/2 does not" do
     {:ok, server} = Server.start(@model)
-    assert Server.run(server, &Interpreter.tensors_size/1) > 0
+    # an error tuple sorts above every number, so `> 0` used to hold for
+    # {:error, _} as firmly as for a real count
+    size = Server.run(server, &Interpreter.tensors_size/1)
+    assert is_integer(size)
+    assert size > 0
     :ok = Server.stop(server)
   end
 end

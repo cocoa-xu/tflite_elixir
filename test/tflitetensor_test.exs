@@ -65,19 +65,19 @@ defmodule TFLiteElixir.TFLiteTensor.Test do
 
     TFLiteTensor.set_data(t, ones)
     t = Interpreter.tensor(interpreter, 0)
-    assert Nx.all_close(ones, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
+    assert close?(ones, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
 
     TFLiteTensor.set_data(t, zeros_binary)
     t = Interpreter.tensor(interpreter, 0)
-    assert Nx.all_close(zeros, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
+    assert close?(zeros, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
 
     TFLiteTensor.set_data(t.reference, ones_binary)
     t = Interpreter.tensor(interpreter, 0)
-    assert Nx.all_close(ones, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
+    assert close?(ones, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
 
     TFLiteTensor.set_data(t.reference, zeros)
     t = Interpreter.tensor(interpreter, 0)
-    assert Nx.all_close(zeros, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
+    assert close?(zeros, TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend))
   end
 
   test "to_binary/2" do
@@ -104,34 +104,48 @@ defmodule TFLiteElixir.TFLiteTensor.Test do
     :ok = Interpreter.allocate_tensors(interpreter)
 
     t = Interpreter.tensor(interpreter, 0)
+    # against a known value, not against zero: allocation does not clear the
+    # arena, so the old assertion was reading whatever bytes happened to be
+    # there and held only because Nx.all_close answers with a truthy tensor
+    # whether or not the values match
+    ones = Nx.broadcast(Nx.tensor(1, type: :u8), {1, 224, 224, 3})
+    :ok = TFLiteTensor.set_data(t, ones)
+
     %Nx.Tensor{} = nx_tensor = TFLiteTensor.to_nx(t)
     assert nx_tensor.shape == {1, 224, 224, 3}
-    assert Nx.all_close(nx_tensor, 0)
+    assert close?(ones, nx_tensor)
   end
 
   test "to_nx/2" do
     filename = Path.join([__DIR__, "test_data", "mobilenet_v2_1.0_224_inat_bird_quant.tflite"])
     interpreter = Interpreter.new!(filename)
+    :ok = Interpreter.allocate_tensors(interpreter)
     t = Interpreter.tensor(interpreter, 0)
+    ones = Nx.broadcast(Nx.tensor(1, type: :u8), {1, 224, 224, 3})
+    :ok = TFLiteTensor.set_data(t, ones)
 
     %Nx.Tensor{} = nx_tensor = TFLiteTensor.to_nx(t, backend: Nx.BinaryBackend)
     assert nx_tensor.shape == {1, 224, 224, 3}
-    assert Nx.all_close(nx_tensor, 0)
+    assert close?(ones, nx_tensor)
 
+    # and the same tensor reached by its handle rather than the struct
     t = Interpreter.tensor(interpreter, 0)
     %Nx.Tensor{} = nx_tensor = TFLiteTensor.to_nx(t.reference, backend: Nx.BinaryBackend)
     assert nx_tensor.shape == {1, 224, 224, 3}
-    assert Nx.all_close(nx_tensor, 0)
+    assert close?(ones, nx_tensor)
   end
 
   test "to_nx/2 with backend: nil" do
     filename = Path.join([__DIR__, "test_data", "mobilenet_v2_1.0_224_inat_bird_quant.tflite"])
     interpreter = Interpreter.new!(filename)
+    :ok = Interpreter.allocate_tensors(interpreter)
     t = Interpreter.tensor(interpreter, 0)
+    ones = Nx.broadcast(Nx.tensor(1, type: :u8), {1, 224, 224, 3})
+    :ok = TFLiteTensor.set_data(t, ones)
 
     %Nx.Tensor{} = nx_tensor = TFLiteTensor.to_nx(t, backend: nil)
     assert nx_tensor.shape == {1, 224, 224, 3}
-    assert Nx.all_close(nx_tensor, 0)
+    assert close?(ones, nx_tensor)
   end
 
   test "to_nx/2 with wrong backend" do
@@ -153,4 +167,10 @@ defmodule TFLiteElixir.TFLiteTensor.Test do
                    TFLiteTensor.to_nx(t, backend: true)
                  end
   end
+
+  # Nx.all_close answers with a u8 tensor, and every tensor is truthy, so
+  # `assert Nx.all_close(a, b)` held just as firmly when a and b were nothing
+  # alike. Compare the number it carries instead.
+  defp close?(a, b), do: Nx.to_number(Nx.all_close(a, b)) == 1
+
 end
