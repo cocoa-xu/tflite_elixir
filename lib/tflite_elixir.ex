@@ -20,8 +20,14 @@ defmodule TFLiteElixir do
   @doc """
   Resets a variable tensor to the default value.
   """
-  @spec reset_variable_tensor(%TFLiteTensor{}) :: any
-  def reset_variable_tensor(%TFLiteTensor{} = tflite_tensor) do
-    :tflite_beam_nif.tflite_reset_variable_tensor(tflite_tensor)
+  @spec reset_variable_tensor(%TFLiteTensor{} | reference()) :: :ok | {:error, String.t()}
+  def reset_variable_tensor(%TFLiteTensor{reference: reference}) do
+    # was: passing the struct itself, which the NIF resolves as a resource and
+    # never can, so this returned {:error, "cannot access ..."} every single time
+    reset_variable_tensor(reference)
+  end
+
+  def reset_variable_tensor(reference) when is_reference(reference) do
+    :tflite_beam_nif.tflite_reset_variable_tensor(reference)
   end
 end

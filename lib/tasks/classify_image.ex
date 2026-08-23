@@ -118,8 +118,7 @@ defmodule Mix.Tasks.ClassifyImage do
 
     input_image = StbImage.resize(input_image, h, w)
 
-    [scale] = input_tensor.quantization_params.scale
-    [zero_point] = input_tensor.quantization_params.zero_point
+    {scale, zero_point} = one_scale_and_zero_point(input_tensor.quantization_params)
     mean = args[:mean]
     std = args[:std]
 
@@ -137,7 +136,16 @@ defmodule Mix.Tasks.ClassifyImage do
       |> Nx.as_type(:u8)
       |> Nx.to_binary()
     end
+    # set_data is all-or-nothing and answers {:error, _} when the byte count is
+    # wrong, which an RGBA image produces because nothing here asks StbImage for
+    # three channels. Dropping that answer meant invoking on a tensor that had
+    # not been written and reporting a confident classification of whatever the
+    # arena held.
     |> then(&TFLiteTensor.set_data(input_tensor, &1))
+    |> case do
+      :ok -> :ok
+      {:error, reason} -> raise ArgumentError, "cannot write the input tensor: #{reason}"
+    end
 
     IO.puts("----INFERENCE TIME----")
 
@@ -225,8 +233,7 @@ defmodule Mix.Tasks.ClassifyImage do
   end
 
   defp get_scores(output_data, %TFLiteTensor{type: dtype = {:s, _}} = output_tensor) do
-    [scale] = output_tensor.quantization_params.scale
-    [zero_point] = output_tensor.quantization_params.zero_point
+    {scale, zero_point} = one_scale_and_zero_point(output_tensor.quantization_params)
 
     Nx.from_binary(output_data, dtype)
     |> Nx.as_type({:s, 64})
@@ -237,4 +244,13 @@ defmodule Mix.Tasks.ClassifyImage do
   defp get_scores(output_data, %TFLiteTensor{type: dtype}) do
     Nx.from_binary(output_data, dtype)
   end
+
+  # A tensor that is not quantized has an empty scale list, and one quantized per
+  # axis has several. Matching [scale] against either raises, and the unquantized
+  # case is the common one: of the three models shipped for tests, two have an
+  # empty scale on the output. Falling back to the identity leaves an unquantized
+  # tensor alone, which is what "not quantized" means.
+  defp one_scale_and_zero_point(%{scale: [scale], zero_point: [zero_point]}), do: {scale, zero_point}
+  defp one_scale_and_zero_point(_), do: {1.0, 0}
+
 end

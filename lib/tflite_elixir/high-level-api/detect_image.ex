@@ -147,7 +147,16 @@ defmodule TFLiteElixir.ObjectDetection do
     |> Nx.as_type(:u8)
     |> Nx.put_slice([0, 0, 0, 0], resized)
     |> Nx.to_binary()
+    # set_data is all-or-nothing and answers {:error, _} when the byte count is
+    # wrong, which an RGBA image produces because nothing here asks StbImage for
+    # three channels. Dropping that answer meant invoking on a tensor that had
+    # not been written and reporting a confident classification of whatever the
+    # arena held.
     |> then(&TFLiteTensor.set_data(input_tensor, &1))
+    |> case do
+      :ok -> :ok
+      {:error, reason} -> raise ArgumentError, "cannot write the input tensor: #{reason}"
+    end
 
     Interpreter.invoke!(interpreter)
 

@@ -127,34 +127,42 @@ defmodule TFLiteElixir.TFLiteTensor do
   def to_nx(self_struct, opts \\ [])
 
   def to_nx(self_struct, opts) when is_struct(self_struct, T) and is_list(opts) do
-    type = type(self_struct)
-    shape = List.to_tuple(dims(self_struct))
-    backend = opts[:backend]
-
-    case to_binary(self_struct) do
-      binary when is_binary(binary) ->
-        to_nx_backend(binary, type, backend)
-        |> Nx.reshape(shape)
-
-      error ->
-        error
+    with {:ok, type} <- nx_type(type(self_struct)),
+         {:ok, shape} <- nx_shape(dims(self_struct)),
+         binary when is_binary(binary) <- to_binary(self_struct) do
+      binary
+      |> to_nx_backend(type, opts[:backend])
+      |> Nx.reshape(shape)
     end
   end
 
   def to_nx(self, opts) when is_reference(self) and is_list(opts) do
-    type = type(self)
-    shape = List.to_tuple(dims(self))
-    backend = opts[:backend]
-
-    case to_binary(self) do
-      binary when is_binary(binary) ->
-        to_nx_backend(binary, type, backend)
-        |> Nx.reshape(shape)
-
-      error ->
-        error
+    with {:ok, type} <- nx_type(type(self)),
+         {:ok, shape} <- nx_shape(dims(self)),
+         binary when is_binary(binary) <- to_binary(self) do
+      binary
+      |> to_nx_backend(type, opts[:backend])
+      |> Nx.reshape(shape)
     end
   end
+
+  # Nx cannot represent several of the types TfLite reports, and a bool output is
+  # ordinary for a segmentation mask. Handing one of those atoms to
+  # Nx.from_binary raises from inside Nx about numerical types, which says
+  # nothing about which tensor or why. dims/1 and type/1 were not checked for
+  # {:error, _} either, so a retired handle reached Nx as a tuple and raised
+  # there instead. The error-tuple clause has to come first: {:error, Reason} is
+  # itself a two-element tuple and would otherwise pass for a type.
+  defp nx_type({:error, reason}), do: {:error, reason}
+
+  defp nx_type({kind, bits} = type) when is_atom(kind) and is_integer(bits), do: {:ok, type}
+
+  defp nx_type(other),
+    do: {:error, "this tensor's type, #{inspect(other)}, has no Nx equivalent"}
+
+  defp nx_shape({:error, reason}), do: {:error, reason}
+  defp nx_shape(dims) when is_list(dims), do: {:ok, List.to_tuple(dims)}
+  defp nx_shape(other), do: {:error, "cannot read this tensor's shape: #{inspect(other)}"}
 
   defp to_nx_backend(binary, type, backend) do
     case backend do
