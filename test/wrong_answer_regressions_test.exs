@@ -66,6 +66,26 @@ defmodule TFLiteElixir.WrongAnswerRegressionsTest do
     end
   end
 
+  describe "MobileBert pads up to the sequence length" do
+    test "every feature reaches the length the model declares" do
+      vocabulary =
+        ["[CLS]", "[SEP]", "[UNK]", "what", "is", "this", "a", "test", "of", "the", "thing"]
+        |> Enum.with_index()
+        |> Map.new()
+
+      {features, _content} =
+        TFLiteElixir.MobileBert.preprocessing(vocabulary, "what is this", "a test of the thing")
+
+      # n_padding was count(input_ids) - max_seq_len, and the content is already
+      # cut so that input_ids can never exceed max_seq_len, so it was zero or
+      # less every time and the padding branch never ran. run/3 matches :ok on
+      # set_data, so anything that did not exactly fill the sequence raised.
+      assert 384 == length(features.input_ids)
+      assert 384 == length(features.input_mask)
+      assert 384 == length(features.segment_ids)
+    end
+  end
+
   describe "handles and types that Nx cannot take" do
     test "to_nx on a dead reference answers instead of raising" do
       assert {:error, reason} = TFLiteTensor.to_nx(make_ref())

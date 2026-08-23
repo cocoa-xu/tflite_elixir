@@ -80,7 +80,10 @@ defmodule TFLiteElixir.MobileBert do
     postprocessing(start_logits, end_logits, content_data)
   end
 
-  defp preprocessing(vocab_map, query, content) do
+  @doc false
+  # Public only so the padding arithmetic can be tested without a model: it needs
+  # a vocabulary and two strings, nothing else.
+  def preprocessing(vocab_map, query, content) do
     query_tokens = FullTokenizer.tokenize(query, true, vocab_map)
     content_words = String.split(content)
 
@@ -122,7 +125,14 @@ defmodule TFLiteElixir.MobileBert do
     {:ok, input_ids} = FullTokenizer.convert_to_id(tokens, vocab_map)
     input_mask = List.duplicate(1, Enum.count(input_ids))
 
-    n_padding = Enum.count(input_ids) - @max_seq_len
+    # The other way round. content_tokens is already cut to
+    # @max_seq_len - length(query) - 3 above, and the three brackets put back
+    # exactly those three, so input_ids can never be longer than @max_seq_len.
+    # Subtracting in the old order therefore gave zero or less every time, the
+    # branch below never ran, and the tensors went to the model short of their
+    # {1, 384}. run/3 matches :ok on set_data, so that was a MatchError for any
+    # input that did not happen to fill the sequence exactly.
+    n_padding = @max_seq_len - Enum.count(input_ids)
 
     {input_ids, input_mask, segment_ids} =
       if n_padding > 0 do
