@@ -15,15 +15,15 @@ defmodule TFLiteElixir.ObjectDetection.Test do
   test "ObjectDetection" do
     {:ok, pid} = ObjectDetection.start(@model_path)
 
-    [%{class_id: 16, score: score, label: nil, bbox: [3, -1, 294, 240]}] =
+    [%{class_id: 16, score: score, label: nil, bbox: [15, -6, 1177, 961]}] =
       ObjectDetection.predict(pid, @input_path)
 
     assert_in_delta score, 0.934, 0.05
 
-    [%{class_id: 16, bbox: [3, -1, 294, 240]}] =
+    [%{class_id: 16, bbox: [15, -6, 1177, 961]}] =
       ObjectDetection.predict(pid, StbImage.read_file!(@input_path))
 
-    [%{class_id: 16, bbox: [3, -1, 294, 240]}] =
+    [%{class_id: 16, bbox: [15, -6, 1177, 961]}] =
       ObjectDetection.predict(pid, StbImage.to_nx(StbImage.read_file!(@input_path)))
   end
 
@@ -42,6 +42,26 @@ defmodule TFLiteElixir.ObjectDetection.Test do
 
     # per-call options override the ones given at start
     [%{class_id: 16}] = ObjectDetection.predict(pid, @input_path, threshold: 0.4)
+  end
+
+  # The boxes are in source image pixels. They used to come back in the model
+  # input's 300x300 instead, because the letterbox scale was applied twice and
+  # cancelled itself out, so every box was a quarter of its true size on this
+  # image. Fixed numbers alone would not have caught that going back: these
+  # assertions hold only if the box is measured against the image.
+  test "ObjectDetection answers in source image coordinates" do
+    {:ok, pid} = ObjectDetection.start(@model_path)
+    %StbImage{shape: {h, w, _}} = StbImage.read_file!(@input_path)
+    [%{bbox: [ymin, xmin, ymax, xmax]}] = ObjectDetection.predict(pid, @input_path)
+
+    # the cat fills the frame, so the box covers most of the image, and most of
+    # the image is well outside anything the 300x300 input could express
+    assert ymax > div(h, 2)
+    assert xmax > div(w, 2)
+    assert ymax <= h
+    assert xmax <= w
+    assert ymin < ymax
+    assert xmin < xmax
   end
 
   @tag :require_tpu

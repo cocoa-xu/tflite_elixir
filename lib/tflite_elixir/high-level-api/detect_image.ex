@@ -173,16 +173,23 @@ defmodule TFLiteElixir.ObjectDetection do
       |> hd()
       |> trunc()
 
-    {sx, sy} = {height / scale, width / scale}
+    # the boxes come back normalised against the model input, where the image
+    # sits letterboxed in the top left corner. Multiplying by the input side
+    # gives a pixel inside that tensor, and dividing by the letterbox scale puts
+    # it back in the source image, which is the space the caller works in.
+    # sx was taken from the height and sy from the width, which only agreed
+    # because every model here has a square input.
+    {sy, sx} = {height / scale, width / scale}
 
     Enum.reduce(0..(count - 1)//1, [], fn index, acc ->
       score = scores |> Nx.take(index) |> Nx.to_flat_list() |> hd()
 
       if score >= threshold do
         [ymin, xmin, ymax, xmax] =
+          # not multiplied by the scale here: sy and sx already divide by it, so
+          # doing both cancelled out and left the box in model input pixels
           boxes
           |> Nx.take(index)
-          |> Nx.multiply(scale)
           |> Nx.to_flat_list()
 
         class_id = class_ids |> Nx.take(index) |> Nx.to_flat_list() |> hd() |> trunc()

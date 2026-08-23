@@ -23,7 +23,7 @@ defmodule TFLiteElixir.Test.DetectImage do
            cat
              id   : 16
              score: 0.934
-             bbox : [3, -1, 294, 240]
+             bbox : [15, -6, 1177, 961]
            """ =
              String.split(output, "\n")
              |> List.delete_at(0)
