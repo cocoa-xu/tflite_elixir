@@ -467,13 +467,24 @@ defmodule TFLiteElixir.Interpreter do
   def predict(interpreter, input) do
     with {:ok, input_tensors} <- Interpreter.inputs(interpreter),
          {:ok, output_tensors} <- Interpreter.outputs(interpreter),
-         :ok <- fill_input(interpreter, input_tensors, input) do
-      Interpreter.invoke(interpreter)
+         :ok <- fill_input(interpreter, input_tensors, input),
+         # The result of the invoke decides whether the output tensors mean
+         # anything. Dropping it meant reading them anyway, so a refused or
+         # failed run handed back the answer from the run before, as a perfectly
+         # ordinary Nx tensor with no way for the caller to tell.
+         :ok <- Interpreter.invoke(interpreter) do
       fetch_output(interpreter, output_tensors)
     else
       error -> error
     end
   end
+
+  # Filling answers with :ok, a bare message, or {:error, message} depending on
+  # which path produced it. Everything that collects those has to agree on one
+  # shape or the join over them breaks on whichever it did not expect.
+  defp reason_of({:error, reason}), do: to_string(reason)
+  defp reason_of(reason) when is_binary(reason), do: reason
+  defp reason_of(other), do: inspect(other)
 
   defp fill_input(interpreter, input_tensors, input)
        when is_list(input_tensors) and is_list(input) do
@@ -483,17 +494,22 @@ defmodule TFLiteElixir.Interpreter do
           fill_input(interpreter, input_tensor_index, input_data)
         end)
 
-      all_filled = Enum.all?(fill_results, fn r -> r == :ok end)
-
-      if all_filled do
-        :ok
-      else
-        Enum.reject(fill_results, fn x -> x == :ok end)
+      case Enum.reject(fill_results, &(&1 == :ok)) do
+        [] -> :ok
+        failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
       end
     else
       {:error,
        "length mismatch: there are #{length(input_tensors)} input tensors while the input list has #{length(input)} elements"}
     end
+  end
+
+  # The @spec has allowed a bare binary since this was written and there was no
+  # clause for it, so every caller who took the documentation at its word got a
+  # FunctionClauseError. The Erlang layer has had this clause all along.
+  defp fill_input(interpreter, input_tensors, input)
+       when is_list(input_tensors) and is_binary(input) do
+    fill_input(interpreter, input_tensors, [input])
   end
 
   defp fill_input(interpreter, input_tensors, %Nx.Tensor{} = input)
@@ -544,18 +560,18 @@ defmodule TFLiteElixir.Interpreter do
         data = Map.get(input, name, nil)
 
         if data do
+          # was: fill_input(out_tensor, data); :ok
+          # which ran inference on a tensor that had not been written
           fill_input(out_tensor, data)
-          :ok
         else
           "missing input data for tensor `#{name}`, tensor index: #{input_tensor_index}"
         end
       end)
       |> Enum.reject(fn r -> r == :ok end)
 
-    if ret == [] do
-      :ok
-    else
-      {:error, Enum.join(ret, "; ")}
+    case ret do
+      [] -> :ok
+      failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
     end
   end
 
@@ -570,9 +586,15 @@ defmodule TFLiteElixir.Interpreter do
 
   defp fetch_output(interpreter, output_tensors)
        when is_list(output_tensors) do
-    Enum.map(output_tensors, fn output_index ->
-      fetch_output(interpreter, output_index)
-    end)
+    outputs = Enum.map(output_tensors, &fetch_output(interpreter, &1))
+
+    # An output that could not be read is the whole call failing, not an item in
+    # the list. A caller matching [out] would otherwise bind an error tuple and
+    # carry on with it as though it were a tensor.
+    case Enum.filter(outputs, &match?({:error, _}, &1)) do
+      [] -> outputs
+      failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
+    end
   end
 
   defp fetch_output(interpreter, output_index) when is_integer(output_index) do

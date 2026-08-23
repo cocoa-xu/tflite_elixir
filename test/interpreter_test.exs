@@ -217,10 +217,14 @@ defmodule TFLiteElixir.Interpreter.Test do
 
     error = Interpreter.predict(interpreter, [Nx.from_binary(input_data, :f32)])
 
-    assert [
-             error:
-               "input data type, {:f, 32}, does not match the data type of the tensor, {:u, 8}, tensor index: 0"
-           ] == error
+    # One error for the whole call. This used to be a bare list with an error
+    # tuple inside it, which the length-mismatch case two assertions up already
+    # returned correctly, so the same function answered two different shapes
+    # depending on which way the input was wrong and only one of them was a
+    # caller could match on.
+    assert {:error,
+            "input data type, {:f, 32}, does not match the data type of the tensor, {:u, 8}, tensor index: 0"} ==
+             error
 
     error = Interpreter.predict(interpreter, %{"A" => input_tensor})
 
