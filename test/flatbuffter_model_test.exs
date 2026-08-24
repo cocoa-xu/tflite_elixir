@@ -115,7 +115,7 @@ defmodule TFLiteElixir.FlatBufferModel.Test do
   test "buildFromBuffer/1 with invalid file" do
     filename = Path.join([__DIR__, "test_data", "cat.jpeg"])
 
-    assert {:error, "cannot get flatbuffer model"} ==
+    assert {:error, "cannot build model from buffer: not a valid flatbuffer"} ==
              FlatBufferModel.build_from_buffer(File.read!(filename))
   end
 
@@ -183,6 +183,13 @@ defmodule TFLiteElixir.FlatBufferModel.Test do
                    ],
                    output_tensor_metadata: [
                      %{
+                       # this tensor holds plain feature values, and up to
+                       # tflite_beam 0.4.0-rc5 that whole content map was
+                       # discarded rather than reported
+                       content: %{
+                         content_properties: %{},
+                         content_properties_type: "FeatureProperties"
+                       },
                        associated_files: [
                          %{
                            description: "Labels for categories that the model can recognize.",

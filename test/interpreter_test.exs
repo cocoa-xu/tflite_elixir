@@ -303,7 +303,7 @@ defmodule TFLiteElixir.Interpreter.Test do
 
     filename = Path.join([__DIR__, "test_data", "cat.jpeg"])
     {:error, reason} = TFLiteElixir.Interpreter.new(filename)
-    assert reason == "cannot get flatbuffer model"
+    assert reason == "cannot build model from file: not a valid flatbuffer"
   end
 
   test ":tflite_beam_interpreter.new(model_path)" do
@@ -317,6 +317,6 @@ defmodule TFLiteElixir.Interpreter.Test do
 
     filename = Path.join([__DIR__, "test_data", "cat.jpeg"])
     {:error, reason} = TFLiteElixir.Interpreter.new_from_buffer(File.read!(filename))
-    assert reason == "cannot get flatbuffer model"
+    assert reason == "cannot build model from buffer: not a valid flatbuffer"
   end
 end
