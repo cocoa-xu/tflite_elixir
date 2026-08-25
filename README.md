@@ -409,4 +409,10 @@ TensorFlow's; the two version lines are not comparable, so LiteRT's 2.2.0 is
 newer than TensorFlow's 2.21.0 rather than older. That number is what a delegate
 plugin has to match.
 
+This release requires `nx ~> 0.11`, up from `~> 0.5`. LiteRT reports two eight
+bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
+`{:f8_e4m3fn, 8}` for E4M3FN in 0.11.0. On an older Nx, `TFLiteTensor.to_nx/2`
+raises `ArgumentError` on either of those tensors, so the floor states what the
+binding can actually hand over rather than leaving it to be discovered.
+
 Documentation can be found at <https://hexdocs.pm/tflite_elixir>.

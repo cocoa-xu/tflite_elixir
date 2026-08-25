@@ -173,4 +173,21 @@ defmodule TFLiteElixir.TFLiteTensor.Test do
   # alike. Compare the number it carries instead.
   defp close?(a, b), do: Nx.to_number(Nx.all_close(a, b)) == 1
 
+  test "to_nx/1 carries both eight bit float formats" do
+    filename = Path.join([__DIR__, "test_data", "fp8_types.bin"])
+    interpreter = Interpreter.new!(filename)
+
+    e4m3fn = Interpreter.tensor(interpreter, 0)
+    e5m2 = Interpreter.tensor(interpreter, 1)
+
+    assert "e4m3fn" == e4m3fn.name
+    assert "e5m2" == e5m2.name
+    assert {:f8_e4m3fn, 8} == TFLiteTensor.type(e4m3fn)
+    assert {:f, 8} == TFLiteTensor.type(e5m2)
+
+    # The values are whatever the unallocated arena holds, so only the type
+    # carries meaning here. Nx raises on both of these before 0.11.0.
+    assert {:f8_e4m3fn, 8} == Nx.type(TFLiteTensor.to_nx(e4m3fn, backend: Nx.BinaryBackend))
+    assert {:f, 8} == Nx.type(TFLiteTensor.to_nx(e5m2, backend: Nx.BinaryBackend))
+  end
 end

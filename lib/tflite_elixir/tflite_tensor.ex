@@ -157,14 +157,11 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   # No clause for the two 8 bit float formats. A tflite_beam built from LiteRT
   # reports them under the names Nx uses, {:f, 8} for E5M2 and {:f8_e4m3fn, 8}
-  # for E4M3FN, so the general clause below carries them without translating;
-  # 0.4.0-rc6 and earlier have no 8 bit float type at all, so there is nothing
-  # for this to carry there either.
-  #
-  # {:f8_e4m3fn, 8} arrived in Nx 0.13. On anything older it raises from inside
-  # Nx, which is the right outcome: there is no correct way to hand E4M3FN bytes
-  # to a library that cannot represent them, and reading them as {:f, 8} would
-  # answer a different number rather than fail.
+  # for E4M3FN, so the general clause below carries them without translating.
+  # Nx gained {:f, 8} in 0.9.0 and {:f8_e4m3fn, 8} in 0.11.0; mix.exs requires
+  # 0.11 so that every type this can emit is one Nx can represent. Reading
+  # E4M3FN bytes as {:f, 8} would answer a different number rather than fail,
+  # so translating between them is never the fallback.
   defp nx_type({kind, bits} = type) when is_atom(kind) and is_integer(bits), do: {:ok, type}
 
   defp nx_type(other),

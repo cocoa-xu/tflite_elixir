@@ -27,7 +27,7 @@ defmodule TFLiteElixir.MixProject do
   defp deps do
     [
       {:tflite_beam, "1.0.0-rc1"},
-      {:nx, "~> 0.5"},
+      {:nx, "~> 0.11"},
       {:stb_image, "~> 0.6"},
       {:ex_doc, "~> 0.27", only: :docs, runtime: false}
     ]
