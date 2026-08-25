@@ -155,16 +155,16 @@ defmodule TFLiteElixir.TFLiteTensor do
   # itself a two-element tuple and would otherwise pass for a type.
   defp nx_type({:error, reason}), do: {:error, reason}
 
-  # Both 8 bit float formats name themselves rather than their width, because
-  # the width does not say which one it is and reading one as the other answers
-  # a different number instead of failing. Nx spells them differently again:
-  # E5M2 is the unadorned {:f, 8}, and E4M3FN is {:f8_e4m3fn, 8}, which arrived
-  # in Nx 0.13. On anything older the second one raises from inside Nx, which
-  # is the right outcome: there is no correct way to hand E4M3FN bytes to a
-  # library that cannot represent them.
-  defp nx_type({:f, :e5m2}), do: {:ok, {:f, 8}}
-  defp nx_type({:f, :e4m3fn}), do: {:ok, {:f8_e4m3fn, 8}}
-
+  # No clause for the two 8 bit float formats. A tflite_beam built from LiteRT
+  # reports them under the names Nx uses, {:f, 8} for E5M2 and {:f8_e4m3fn, 8}
+  # for E4M3FN, so the general clause below carries them without translating;
+  # 0.4.0-rc6 and earlier have no 8 bit float type at all, so there is nothing
+  # for this to carry there either.
+  #
+  # {:f8_e4m3fn, 8} arrived in Nx 0.13. On anything older it raises from inside
+  # Nx, which is the right outcome: there is no correct way to hand E4M3FN bytes
+  # to a library that cannot represent them, and reading them as {:f, 8} would
+  # answer a different number rather than fail.
   defp nx_type({kind, bits} = type) when is_atom(kind) and is_integer(bits), do: {:ok, type}
 
   defp nx_type(other),
