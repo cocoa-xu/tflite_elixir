@@ -388,4 +388,25 @@ def deps do
 end
 ```
 
+The 1.0.0 release candidates build the runtime from
+[LiteRT](https://github.com/google-ai-edge/LiteRT) rather than from TensorFlow.
+Hex never resolves a pre-release from a range, so name it exactly:
+
+```elixir
+def deps do
+  [
+    {:tflite_elixir, "1.0.0-rc1"}
+  ]
+end
+```
+
+`~> 0.3` will not reach it, which is deliberate: a two part 0.x requirement means
+everything below 1.0.0, so releasing this as 0.4.0 would have moved every
+existing user onto a different upstream without their asking. Nothing in the
+Elixir API was removed or renamed. The one answer that changed is
+`TFLiteElixir.tflite_version/0`, which reports LiteRT's version rather than
+TensorFlow's; the two version lines are not comparable, so LiteRT's 2.2.0 is
+newer than TensorFlow's 2.21.0 rather than older. That number is what a delegate
+plugin has to match.
+
 Documentation can be found at <https://hexdocs.pm/tflite_elixir>.
