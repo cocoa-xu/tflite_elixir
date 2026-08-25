@@ -94,4 +94,27 @@ defmodule TFLiteElixir.ObjectDetection.Test do
       assert xmax - xmin > 0.5 * w
     end
   end
+
+  test "ObjectDetection answers the same whichever form the image arrives in" do
+    {:ok, pid} = ObjectDetection.start(@model_path)
+    cat = StbImage.read_file!(@input_path)
+
+    by_path = ObjectDetection.predict(pid, @input_path)
+
+    assert by_path == ObjectDetection.predict(pid, cat)
+    assert by_path == ObjectDetection.predict(pid, StbImage.to_nx(cat))
+  end
+
+  # a shape this far from square used to truncate its short side to zero, which
+  # StbImage.resize has no clause for, so the call took the server down and
+  # every later caller got :noproc.
+  test "ObjectDetection survives an extreme aspect ratio" do
+    {:ok, pid} = ObjectDetection.start(@model_path)
+    cat = StbImage.read_file!(@input_path)
+
+    for {h, w} <- [{1, 1}, {1, 640}, {640, 1}, {2, 999}, {999, 2}, {37, 91}] do
+      assert is_list(ObjectDetection.predict(pid, StbImage.resize(cat, h, w)))
+      assert Process.alive?(pid)
+    end
+  end
 end

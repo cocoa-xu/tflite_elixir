@@ -136,7 +136,12 @@ defmodule TFLiteElixir.ObjectDetection do
 
     # letterbox: keep the aspect ratio and leave the rest of the tensor zeroed
     scale = min(height / h, width / w)
-    {resized_h, resized_w} = {trunc(h * scale), trunc(w * scale)}
+
+    # an image far enough from square truncates its short side to zero, and
+    # StbImage.resize has no clause for a zero side, so the call raised and took
+    # the server down with it. One row or column keeps the aspect ratio as close
+    # as it can still be represented.
+    {resized_h, resized_w} = {max(trunc(h * scale), 1), max(trunc(w * scale), 1)}
 
     %StbImage{shape: {_, _, channels}, data: resized} =
       StbImage.resize(input_image, resized_h, resized_w)
