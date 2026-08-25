@@ -71,4 +71,27 @@ defmodule TFLiteElixir.ObjectDetection.Test do
     [%{class_id: 16, score: score}] = ObjectDetection.predict(pid, @input_path)
     assert score > 0.4
   end
+
+  # cat.jpeg is very nearly square, so it only ever pads rows. These two shapes
+  # drive the letterbox down each branch and check the box lands back inside the
+  # source image, which is what padding in the wrong place would break.
+  test "ObjectDetection letterboxes both ways" do
+    {:ok, pid} = ObjectDetection.start(@model_path)
+    cat = StbImage.read_file!(@input_path)
+
+    for {h, w} <- [{1200, 400}, {400, 1200}] do
+      [%{class_id: class_id, bbox: [ymin, xmin, ymax, xmax]}] =
+        ObjectDetection.predict(pid, StbImage.resize(cat, h, w))
+
+      assert 16 == class_id
+
+      # the model is free to predict a little past the edge, so this is not a
+      # containment check: it says the box came back on the source image's
+      # scale rather than the padded input's, and still covers the animal.
+      assert ymin > -0.05 * h and ymax < 1.05 * h
+      assert xmin > -0.05 * w and xmax < 1.05 * w
+      assert ymax - ymin > 0.5 * h
+      assert xmax - xmin > 0.5 * w
+    end
+  end
 end
