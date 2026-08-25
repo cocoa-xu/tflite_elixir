@@ -2,7 +2,7 @@ defmodule TFLiteElixir.MixProject do
   use Mix.Project
 
   @app :tflite_elixir
-  @version "1.0.0-rc1"
+  @version "1.0.0-rc2"
   @github_url "https://github.com/cocoa-xu/tflite_elixir"
 
   def project do

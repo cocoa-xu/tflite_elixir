@@ -395,7 +395,7 @@ Hex never resolves a pre-release from a range, so name it exactly:
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "1.0.0-rc1"}
+    {:tflite_elixir, "1.0.0-rc2"}
   ]
 end
 ```
