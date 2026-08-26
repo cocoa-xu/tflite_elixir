@@ -190,4 +190,17 @@ defmodule TFLiteElixir.TFLiteTensor.Test do
     assert {:f8_e4m3fn, 8} == Nx.type(TFLiteTensor.to_nx(e4m3fn, backend: Nx.BinaryBackend))
     assert {:f, 8} == Nx.type(TFLiteTensor.to_nx(e5m2, backend: Nx.BinaryBackend))
   end
+
+  test "an interpreter's error answer travels through the tensor functions" do
+    reason = "interpreter is already in use by another process"
+    err = {:error, reason}
+
+    assert err == TFLiteTensor.type(err)
+    assert err == TFLiteTensor.dims(err)
+    assert err == TFLiteTensor.shape(err)
+    assert err == TFLiteTensor.quantization_params(err)
+    assert err == TFLiteTensor.to_binary(err)
+    assert err == TFLiteTensor.to_nx(err)
+    assert err == TFLiteTensor.set_data(err, <<0>>)
+  end
 end

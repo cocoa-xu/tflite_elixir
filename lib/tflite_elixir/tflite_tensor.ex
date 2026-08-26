@@ -43,6 +43,13 @@ defmodule TFLiteElixir.TFLiteTensor do
   Get the data type
   """
   @spec type(%T{}) :: tensor_type()
+  # Interpreter.tensor/2 answers {:error, _} when the interpreter is held by
+  # another process or the handle has been retired, and that answer flows
+  # straight into whichever of these the caller piped it to. Without a clause
+  # for it the caller lost the reason and got a FunctionClauseError raised from
+  # in here instead, which names neither.
+  def type({:error, reason}), do: {:error, reason}
+
   def type(%T{type: type}), do: type
 
   @spec type(reference()) :: tensor_type() | nif_error()
@@ -54,6 +61,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   Get the dimensions (C++) API
   """
   @spec dims(%T{}) :: [integer()]
+  def dims({:error, reason}), do: {:error, reason}
+
   def dims(%T{shape: shape}), do: Tuple.to_list(shape)
 
   @spec dims(reference()) :: [integer()] | nif_error()
@@ -65,6 +74,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   Get the tensor shape
   """
   @spec shape(%T{}) :: tuple()
+  def shape({:error, reason}), do: {:error, reason}
+
   def shape(%T{shape: shape}), do: shape
 
   @spec shape(reference()) :: tuple() | nif_error()
@@ -76,7 +87,10 @@ defmodule TFLiteElixir.TFLiteTensor do
   Get the quantization params
   """
   @spec quantization_params(%T{} | reference()) :: %TFLiteQuantizationParams{} | nif_error()
-  def quantization_params(%T{quantization_params: quantization_params}), do: quantization_params
+  def quantization_params({:error, reason}), do: {:error, reason}
+
+  def quantization_params(%T{quantization_params: quantization_params}),
+    do: quantization_params
 
   def quantization_params(self) do
     case :tflite_beam_tensor.quantization_params(self) do
@@ -96,6 +110,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   Set tensor data
   """
   @spec set_data(%T{} | reference(), binary() | %Nx.Tensor{}) :: :ok | nif_error()
+  def set_data({:error, reason}, _data), do: {:error, reason}
+
   def set_data(%T{reference: reference}, data), do: set_data(reference, data)
 
   def set_data(self, %Nx.Tensor{} = data) when is_reference(self) do
@@ -112,6 +128,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   @spec to_binary(%T{} | reference(), non_neg_integer()) :: binary() | {:error, String.t()}
   def to_binary(self, limit \\ 0)
 
+  def to_binary({:error, reason}, _limit), do: {:error, reason}
+
   def to_binary(%T{reference: reference}, limit) when limit >= 0 do
     to_binary(reference, limit)
   end
@@ -125,6 +143,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   """
   @spec to_nx(reference() | %T{}, Keyword.t()) :: %Nx.Tensor{}
   def to_nx(self_struct, opts \\ [])
+
+  def to_nx({:error, reason}, _opts), do: {:error, reason}
 
   def to_nx(self_struct, opts) when is_struct(self_struct, T) and is_list(opts) do
     with {:ok, type} <- nx_type(type(self_struct)),
