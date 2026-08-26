@@ -1,6 +1,16 @@
 defmodule TFLiteElixir.TFLiteTensor do
   @moduledoc """
   A typed multi-dimensional array used in Tensorflow Lite.
+
+  A `%TFLiteTensor{}` is a snapshot of the tensor's metadata plus a live handle
+  to it. `type/1`, `dims/1`, `shape/1` and `quantization_params/1` answer from
+  the snapshot; `to_binary/2`, `to_nx/2` and `set_data/2` go through the handle.
+  The two can disagree after `TFLiteElixir.Interpreter.resize_input_tensor/3`,
+  which moves the interpreter's tensors and retires every handle taken before
+  it: the snapshot still reports the old shape while the handle reports that it
+  has been retired. Fetch the tensor again with
+  `TFLiteElixir.Interpreter.tensor/2` after a resize, or pass `tensor.reference`
+  to ask the interpreter directly.
   """
 
   alias TFLiteElixir.TFLiteQuantizationParams
@@ -41,6 +51,9 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   @doc """
   Get the data type
+
+  Given a struct this answers the snapshot; pass `tensor.reference` to ask the
+  interpreter, which reports a retired handle rather than a stale type.
   """
   @spec type(%T{}) :: tensor_type()
   # Interpreter.tensor/2 answers {:error, _} when the interpreter is held by
@@ -59,6 +72,12 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   @doc """
   Get the dimensions (C++) API
+
+  Given a struct this answers the snapshot taken when the struct was built, so
+  it does not follow a later `TFLiteElixir.Interpreter.resize_input_tensor/3`.
+  Sizing a buffer from a stale answer is the way this bites: the dimensions
+  still multiply out to the old byte count while `set_data/2` on the same
+  struct answers `{:error, _}`. Pass `tensor.reference` to ask the interpreter.
   """
   @spec dims(%T{}) :: [integer()]
   def dims({:error, reason}), do: {:error, reason}
@@ -72,6 +91,9 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   @doc """
   Get the tensor shape
+
+  Given a struct this answers the snapshot; pass `tensor.reference` to ask the
+  interpreter, which reports a retired handle rather than a stale shape.
   """
   @spec shape(%T{}) :: tuple()
   def shape({:error, reason}), do: {:error, reason}
@@ -85,6 +107,9 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   @doc """
   Get the quantization params
+
+  Given a struct this answers the snapshot; pass `tensor.reference` to ask the
+  interpreter, which reports a retired handle rather than stale params.
   """
   @spec quantization_params(%T{} | reference()) :: %TFLiteQuantizationParams{} | nif_error()
   def quantization_params({:error, reason}), do: {:error, reason}
