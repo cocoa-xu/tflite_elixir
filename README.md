@@ -415,4 +415,39 @@ bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
 raises `ArgumentError` on either of those tensors, so the floor states what the
 binding can actually hand over rather than leaving it to be discovered.
 
+## What the numbers actually say
+
+Measured on an Apple M4 Max, macOS 15.7.3, with
+`mobilenet_v2_1.0_224_inat_bird_quant`, 64 images per run. Your machine will give
+different figures; what is worth carrying over is the shape of them.
+
+**Batching buys almost nothing.** `resize_input_tensor/3` to a batch and feeding
+several images at once is a real thing you can do, and it barely pays:
+
+| batch | CPU, per image | Edge TPU, per image |
+| ----- | -------------- | ------------------- |
+| 1     | 7.50 ms        | 10.01 ms            |
+| 4     | 7.19 ms        | 9.89 ms             |
+| 8     | 7.23 ms        | 9.82 ms             |
+| 16    | 7.25 ms        | 9.78 ms             |
+
+Sixteen times the batch is 3% off the per image cost on CPU and 2% on the TPU.
+TFLite's CPU kernels already thread inside a single image, so the batch axis is
+an outer loop rather than the thing that fills the machine; on the USB TPU the
+bytes crossing the wire scale with the batch, so batching them together saves no
+transfer. Batch if it suits how your inputs arrive, not to go faster.
+
+**Two of the three detection models here cannot batch at all.**
+`ssd_mobilenet_v2_coco_quant_postprocess` fails `allocate_tensors/1` after the
+resize. `lite-model_efficientdet_lite4` returns `:ok` and then leaves its output
+at `{1, 25, 4}`: the batch never reaches the answer, so four images in gets one
+result out and the other three are quietly lost. Detection models with fixed
+output postprocessing generally behave this way. If you batch, check the output
+shape followed your resize before trusting it.
+
+**The Edge TPU is not automatically the fast path.** On this machine the USB
+Coral is 33% slower than the CPU for the same model, because a strong CPU plus
+XNNPACK beats a 150KB round trip over USB. On a Raspberry Pi that ordering
+reverses and it is not close. Measure on the machine you will deploy to.
+
 Documentation can be found at <https://hexdocs.pm/tflite_elixir>.
