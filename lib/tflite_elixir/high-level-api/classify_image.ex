@@ -9,41 +9,59 @@ defmodule TFLiteElixir.ImageClassification do
   alias TFLiteElixir.FlatBufferModel
 
   use GenServer
+  # TFLiteElixir.Interpreter.Server settled on 30s and let the caller say
+  # otherwise. These went through GenServer.call's 5s default instead, which is
+  # not a budget anyone chose: it is short enough that a model this project
+  # ships precompiled binaries for, on a board this project ships them to,
+  # cannot finish, and the caller sees an exit rather than a slow answer.
+  @default_timeout 30_000
 
   @spec start(any, any) :: :ignore | {:error, any} | {:ok, pid}
   def start(model, opts \\ []) do
     GenServer.start(__MODULE__, {model, opts})
   end
 
+  @doc """
+  Run the model against an image.
+
+  ## Options
+
+    * `:timeout` - how long to wait for the answer, in milliseconds, or
+      `:infinity`. Defaults to `#{@default_timeout}`. Raise it for a large model
+      or a slow board; inference is local and bounded, so waiting is the right
+      answer more often than giving up.
+  """
   @spec predict(pid(), binary() | %StbImage{} | %Nx.Tensor{}, Keyword.t()) :: term()
   def predict(pid, input_path, opts \\ [])
 
   def predict(pid, input_path, opts) when is_binary(input_path) and is_list(opts) do
-    GenServer.call(pid, {:predict, {:image_path, input_path}, opts})
+    GenServer.call(pid, {:predict, {:image_path, input_path}, opts}, timeout(opts))
   end
 
   def predict(pid, stb_image, opts) when is_struct(stb_image, StbImage) and is_list(opts) do
-    GenServer.call(pid, {:predict, {:stb_image, stb_image}, opts})
+    GenServer.call(pid, {:predict, {:stb_image, stb_image}, opts}, timeout(opts))
   end
 
   def predict(pid, image_data, opts) when is_struct(image_data, Nx.Tensor) and is_list(opts) do
-    GenServer.call(pid, {:predict, {:nx_tensor, image_data}, opts})
+    GenServer.call(pid, {:predict, {:nx_tensor, image_data}, opts}, timeout(opts))
   end
 
   @spec set_label(pid, String.t() | [String.t()]) :: :ok
   def set_label(pid, label_file) when is_binary(label_file) do
-    GenServer.call(pid, {:set_label, label_file})
+    GenServer.call(pid, {:set_label, label_file}, @default_timeout)
   end
 
   def set_label(pid, labels) when is_list(labels) do
-    GenServer.call(pid, {:set_label, labels})
+    GenServer.call(pid, {:set_label, labels}, @default_timeout)
   end
 
   @spec set_label_from_associated_file(pid(), String.t()) :: :ok | {:error, String.t()}
   def set_label_from_associated_file(pid, associated_filename)
       when is_binary(associated_filename) do
-    GenServer.call(pid, {:set_label, :associated_file, associated_filename})
+    GenServer.call(pid, {:set_label, :associated_file, associated_filename}, @default_timeout)
   end
+
+  defp timeout(opts), do: Keyword.get(opts, :timeout, @default_timeout)
 
   @impl true
   def init({model_path, opts}) do
@@ -294,7 +312,8 @@ defmodule TFLiteElixir.ImageClassification do
   # case is the common one: of the three models shipped for tests, two have an
   # empty scale on the output. Falling back to the identity leaves an unquantized
   # tensor alone, which is what "not quantized" means.
-  defp one_scale_and_zero_point(%{scale: [scale], zero_point: [zero_point]}), do: {scale, zero_point}
-  defp one_scale_and_zero_point(_), do: {1.0, 0}
+  defp one_scale_and_zero_point(%{scale: [scale], zero_point: [zero_point]}),
+    do: {scale, zero_point}
 
+  defp one_scale_and_zero_point(_), do: {1.0, 0}
 end

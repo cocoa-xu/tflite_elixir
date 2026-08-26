@@ -117,4 +117,16 @@ defmodule TFLiteElixir.ObjectDetection.Test do
       assert Process.alive?(pid)
     end
   end
+
+  # GenServer.call's own 5s default is not reachable from here, so a model too
+  # slow for it had no way to finish. A millisecond is not enough for any real
+  # inference, which is what makes this prove the option is threaded through.
+  test "ObjectDetection takes a timeout" do
+    {:ok, pid} = ObjectDetection.start(@model_path)
+
+    assert {:timeout, _} = catch_exit(ObjectDetection.predict(pid, @input_path, timeout: 1))
+    assert Process.alive?(pid)
+
+    assert [%{class_id: 16}] = ObjectDetection.predict(pid, @input_path, timeout: :infinity)
+  end
 end
