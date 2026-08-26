@@ -231,28 +231,40 @@ defmodule TFLiteElixir.ObjectDetection do
   # the four outputs are not always in the same order, so prefer what the model
   # declares and fall back to telling them apart by shape
   defp output_tensor_ids(interpreter, output_tensor_numbers) do
-    signature_list = Interpreter.get_signature_defs!(interpreter)
+    case Interpreter.get_signature_defs!(interpreter) do
+      nil ->
+        output_tensor_ids_by_shape(interpreter, output_tensor_numbers)
 
-    if signature_list != nil do
-      signature_list = Map.values(signature_list)
-
-      if Enum.count(signature_list) > 1 do
+      signatures when map_size(signatures) > 1 ->
         raise ArgumentError, "Only support model with one signature."
-      end
 
-      {signature_list[:outputs][:output_0], signature_list[:outputs][:output_1],
-       signature_list[:outputs][:output_2], signature_list[:outputs][:output_3]}
+      signatures ->
+        # Map.values/1 was indexed with :outputs as though it were still a map,
+        # so this answered four nils whenever a model did declare its outputs.
+        # No fixture here carries a signature, so nothing noticed. The names are
+        # the model's and arrive as binaries, like every other name this library
+        # reads out of one.
+        outputs = signatures |> Map.values() |> hd() |> Map.get(:outputs, %{})
+        declared = Enum.map(~w(output_0 output_1 output_2 output_3), &Map.get(outputs, &1))
+
+        if Enum.any?(declared, &is_nil/1) do
+          output_tensor_ids_by_shape(interpreter, output_tensor_numbers)
+        else
+          List.to_tuple(declared)
+        end
+    end
+  end
+
+  defp output_tensor_ids_by_shape(interpreter, output_tensor_numbers) do
+    %TFLiteTensor{} =
+      output_tensor_3 = Interpreter.tensor(interpreter, Enum.at(output_tensor_numbers, 3))
+
+    if output_tensor_3.shape == {1} do
+      {Enum.at(output_tensor_numbers, 3), Enum.at(output_tensor_numbers, 2),
+       Enum.at(output_tensor_numbers, 1), Enum.at(output_tensor_numbers, 0)}
     else
-      %TFLiteTensor{} =
-        output_tensor_3 = Interpreter.tensor(interpreter, Enum.at(output_tensor_numbers, 3))
-
-      if output_tensor_3.shape == {1} do
-        {Enum.at(output_tensor_numbers, 3), Enum.at(output_tensor_numbers, 2),
-         Enum.at(output_tensor_numbers, 1), Enum.at(output_tensor_numbers, 0)}
-      else
-        {Enum.at(output_tensor_numbers, 2), Enum.at(output_tensor_numbers, 0),
-         Enum.at(output_tensor_numbers, 3), Enum.at(output_tensor_numbers, 1)}
-      end
+      {Enum.at(output_tensor_numbers, 2), Enum.at(output_tensor_numbers, 0),
+       Enum.at(output_tensor_numbers, 3), Enum.at(output_tensor_numbers, 1)}
     end
   end
 
