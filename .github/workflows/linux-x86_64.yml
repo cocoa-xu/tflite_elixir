@@ -47,4 +47,6 @@ jobs:
       - name: Compile and Test
         run: |
           mix deps.get
+          # a formatting drift nobody is watching becomes a diff nobody can read
+          mix format --check-formatted
           mix test
