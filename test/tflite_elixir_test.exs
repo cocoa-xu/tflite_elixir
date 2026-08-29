@@ -77,5 +77,4 @@ defmodule TFLiteElixir.Test do
   # `assert Nx.all_close(a, b)` held just as firmly when a and b were nothing
   # alike. Compare the number it carries instead.
   defp close?(a, b), do: Nx.to_number(Nx.all_close(a, b)) == 1
-
 end
