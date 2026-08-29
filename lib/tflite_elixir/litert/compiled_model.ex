@@ -270,7 +270,12 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   that was meant to do something.
   """
   @spec available?() :: boolean()
-  def available?, do: @erl.available()
+  def available? do
+    # Also false against a tflite_beam too old to have the LiteRT modules at
+    # all, which is a different way of not having them and not a reason to
+    # raise at the one call whose job is to answer this.
+    Code.ensure_loaded?(@erl) and function_exported?(@erl, :available, 0) and @erl.available()
+  end
 
   @doc """
   Which buffer kinds this platform can reach, e.g. `%{metal: true, opencl: false}`.
