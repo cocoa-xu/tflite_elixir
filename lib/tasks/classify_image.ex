@@ -250,7 +250,8 @@ defmodule Mix.Tasks.ClassifyImage do
   # case is the common one: of the three models shipped for tests, two have an
   # empty scale on the output. Falling back to the identity leaves an unquantized
   # tensor alone, which is what "not quantized" means.
-  defp one_scale_and_zero_point(%{scale: [scale], zero_point: [zero_point]}), do: {scale, zero_point}
-  defp one_scale_and_zero_point(_), do: {1.0, 0}
+  defp one_scale_and_zero_point(%{scale: [scale], zero_point: [zero_point]}),
+    do: {scale, zero_point}
 
+  defp one_scale_and_zero_point(_), do: {1.0, 0}
 end
