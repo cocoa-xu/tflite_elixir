@@ -24,9 +24,19 @@ defmodule TFLiteElixir.MixProject do
     ]
   end
 
+  # Set TFLITE_BEAM_PATH to develop against a checkout of tflite_beam rather
+  # than the published version. The two repositories move together often enough
+  # that doing this by editing mix.exs invites committing the edit.
+  defp tflite_beam_dep do
+    case System.get_env("TFLITE_BEAM_PATH") do
+      nil -> {:tflite_beam, "1.0.0-rc2"}
+      path -> {:tflite_beam, path: path, override: true}
+    end
+  end
+
   defp deps do
     [
-      {:tflite_beam, "1.0.0-rc2"},
+      tflite_beam_dep(),
       {:nx, "~> 0.11"},
       {:stb_image, "~> 0.6"},
       {:ex_doc, "~> 0.27", only: :docs, runtime: false}
