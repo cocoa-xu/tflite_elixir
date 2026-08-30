@@ -280,9 +280,9 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   @doc """
   Which buffer kinds this platform can reach, e.g. `%{metal: true, opencl: false}`.
 
-  Answers `{:error, reason}` rather than a map on a build without the LiteRT
-  API; `available?/0` is the question to ask first.
+  Answers `{:error, reason}` on a build without the LiteRT API; `available?/0`
+  is the question to ask first.
   """
-  @spec platform_support() :: %{atom() => boolean()} | {:error, String.t()}
+  @spec platform_support() :: {:ok, %{atom() => boolean()}} | {:error, String.t()}
   def platform_support, do: @erl.platform_support()
 end
