@@ -80,6 +80,43 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   @spec run(pid(), [binary()]) :: {:ok, [binary()]} | {:error, String.t()}
   def run(model, inputs), do: @erl.run(model, inputs)
 
+  @doc """
+  Run a function against the compiled model, on the node that owns it.
+
+  The callback is sent to that node and applied there, so it must return
+  something worth sending back: a value, not a handle to something local to it.
+  """
+  @spec with(pid(), (reference() -> result)) :: result | {:error, String.t()}
+        when result: term()
+  def with(model, fun), do: @erl.with(model, fun)
+
+  @doc "As `with/2`, waiting at most `timeout`."
+  @spec with(pid(), (reference() -> result), timeout()) :: result | {:error, String.t()}
+        when result: term()
+  def with(model, fun, timeout), do: @erl.with(model, fun, timeout)
+
+  @doc "Run the model and collect whatever counters the accelerator reports."
+  @spec run_with_metrics(pid(), [binary()]) ::
+          {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
+  def run_with_metrics(model, inputs), do: @erl.run_with_metrics(model, inputs)
+
+  @doc "As `run_with_metrics/2`, at a given detail level."
+  @spec run_with_metrics(pid(), [binary()], non_neg_integer()) ::
+          {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
+  def run_with_metrics(model, inputs, detail_level) do
+    @erl.run_with_metrics(model, inputs, detail_level)
+  end
+
+  @doc "As `run_with_metrics/3`, waiting at most `timeout`."
+  @spec run_with_metrics(pid(), [binary()], non_neg_integer(), timeout()) ::
+          {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
+  def run_with_metrics(model, inputs, detail_level, timeout) do
+    @erl.run_with_metrics(model, inputs, detail_level, timeout)
+  end
+
+  deferror(run_with_metrics(model, inputs))
+  deferror(run_with_metrics(model, inputs, detail_level))
+
   @doc "Run the model, waiting at most `timeout`."
   @spec run(pid(), [binary()], timeout()) :: {:ok, [binary()]} | {:error, String.t()}
   def run(model, inputs, timeout), do: @erl.run(model, inputs, timeout)
