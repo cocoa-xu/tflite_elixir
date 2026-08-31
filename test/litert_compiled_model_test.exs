@@ -232,10 +232,10 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Test do
           assert {:ok, {^ins, _}} = Isolated.with(model, &CompiledModel.io_sizes/1)
 
           # A fun written inline here belongs to a module the compiler kept in
-          # memory, so the peer has nothing to load and refuses. What it says
-          # depends on the tflite_beam underneath, so only the refusal is
-          # asserted; the readable message arrives with 1.0.0-rc4.
-          assert {:error, _why} = Isolated.with(model, fn m -> CompiledModel.io_sizes(m) end)
+          # memory, so the peer has nothing to load. The refusal names the module
+          # and says what does cross, rather than passing on a bare undef.
+          assert {:error, why} = Isolated.with(model, fn m -> CompiledModel.io_sizes(m) end)
+          assert why =~ "no compiled file to send"
 
           Isolated.stop(model)
       end
