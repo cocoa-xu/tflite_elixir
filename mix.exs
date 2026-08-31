@@ -2,7 +2,7 @@ defmodule TFLiteElixir.MixProject do
   use Mix.Project
 
   @app :tflite_elixir
-  @version "1.0.0-rc2"
+  @version "1.0.0-rc3"
   @github_url "https://github.com/cocoa-xu/tflite_elixir"
 
   def project do
@@ -29,7 +29,7 @@ defmodule TFLiteElixir.MixProject do
   # that doing this by editing mix.exs invites committing the edit.
   defp tflite_beam_dep do
     case System.get_env("TFLITE_BEAM_PATH") do
-      nil -> {:tflite_beam, "1.0.0-rc2"}
+      nil -> {:tflite_beam, "1.0.0-rc3"}
       path -> {:tflite_beam, path: path, override: true}
     end
   end
