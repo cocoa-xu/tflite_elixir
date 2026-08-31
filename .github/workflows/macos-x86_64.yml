@@ -26,6 +26,10 @@ jobs:
     env:
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
+      # The LiteRT tests skip themselves without this, and skipping reads as
+      # passing: the suite went green for a whole release while twelve cases
+      # never ran. It selects the precompiled variant that carries the API.
+      TFLITE_BEAM_ENABLE_LITERT_API: "true"
       OTP_VERSION: "26.2.1"
       ELIXIR_VERSION: "1.16.0"
 
