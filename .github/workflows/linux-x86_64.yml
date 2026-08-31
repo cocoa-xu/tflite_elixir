@@ -30,6 +30,10 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TFLITE_BEAM_CORAL_SUPPORT: "true"
       TFLITE_BEAM_PREFER_PRECOMPILED: "true"
+      # The LiteRT tests skip themselves without this, and skipping reads as
+      # passing: the suite went green for a whole release while twelve cases
+      # never ran. It selects the precompiled variant that carries the API.
+      TFLITE_BEAM_ENABLE_LITERT_API: "true"
 
     steps:
       - uses: actions/checkout@v7
