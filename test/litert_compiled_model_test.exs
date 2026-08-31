@@ -168,6 +168,95 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Test do
     end
   end
 
+  # Every one of these is a one line forward, and a one line forward is exactly
+  # what a typo survives: a wrong atom in the dispatch reaches the far side and
+  # comes back as an error nobody looks at. Calling each once is the whole test.
+  describe "forwarding" do
+    test "the server forwards every call it claims to", %{env: env, path: path} do
+      {:ok, server} = Server.start(env, path, accelerators: [:cpu], profile: true)
+      {:ok, {ins, _}} = Server.io_sizes(server)
+      inputs = Enum.map(ins, &:binary.copy(<<0>>, &1))
+
+      assert {:ok, _} = Server.run(server, inputs)
+      assert {:ok, bool} = Server.fully_accelerated(server)
+      assert is_boolean(bool)
+      assert is_boolean(Server.fully_accelerated?(server))
+      assert {:ok, {out, metrics}} = Server.run_with_metrics(server, inputs)
+      assert is_list(out) and is_list(metrics)
+      assert {:ok, events} = Server.profile(server)
+      assert is_list(events)
+      assert {:ok, few} = Server.profile(server, 2)
+      assert length(few) <= 2
+      assert {:ok, n} = Server.pending_events(server)
+      assert is_integer(n)
+      assert {:ok, _} = Server.summarise_profile(server)
+      assert :ok == Server.reset_profile(server)
+      assert {:ok, 0} == Server.pending_events(server)
+
+      Server.stop(server)
+    end
+
+    @tag timeout: 120_000
+    test "the isolated layer forwards every call it claims to", %{path: path} do
+      Process.flag(:trap_exit, true)
+
+      case Isolated.start(model_path: path, accelerators: [:cpu], profile: true) do
+        {:error, reason} ->
+          IO.puts("skipping isolated forwarding: #{inspect(reason)}")
+          assert true
+
+        {:ok, model} ->
+          {:ok, {ins, _}} = Isolated.io_sizes(model)
+          inputs = Enum.map(ins, &:binary.copy(<<0>>, &1))
+
+          assert {:ok, _} = Isolated.run(model, inputs)
+          assert {:ok, bool} = Isolated.fully_accelerated(model)
+          assert is_boolean(bool)
+          assert is_boolean(Isolated.fully_accelerated?(model))
+          assert {:ok, {out, metrics}} = Isolated.run_with_metrics(model, inputs)
+          assert is_list(out) and is_list(metrics)
+          assert {:ok, events} = Isolated.profile(model)
+          assert is_list(events)
+          assert {:ok, few} = Isolated.profile(model, 2)
+          assert length(few) <= 2
+          assert {:ok, n} = Isolated.pending_events(model)
+          assert is_integer(n)
+          assert {:ok, _} = Isolated.summarise_profile(model)
+          assert :ok == Isolated.reset_profile(model)
+          # with/2 sends the callback to the owning node and applies it there,
+          # which needs the module it belongs to to exist over there. A capture
+          # of a compiled function does; a fun written inline in this test does
+          # not, because the compiler kept its module in memory and there is no
+          # file to send. Both are checked, because the second one used to come
+          # back as a bare undef and now says which module and why.
+          assert {:ok, {^ins, _}} = Isolated.with(model, &CompiledModel.io_sizes/1)
+
+          # A fun written inline here belongs to a module the compiler kept in
+          # memory, so the peer has nothing to load and refuses. What it says
+          # depends on the tflite_beam underneath, so only the refusal is
+          # asserted; the readable message arrives with 1.0.0-rc4.
+          assert {:error, _why} = Isolated.with(model, fn m -> CompiledModel.io_sizes(m) end)
+
+          Isolated.stop(model)
+      end
+    end
+
+    test "the direct layer answers about itself", %{env: env, path: path} do
+      assert TFLiteElixir.LiteRT.CompiledModel.available?()
+      assert {:ok, support} = CompiledModel.platform_support()
+      assert is_map(support)
+      assert Enum.all?(Map.values(support), &is_boolean/1)
+
+      model = CompiledModel.new!(env, path, accelerators: [:cpu])
+      {:ok, {ins, _}} = CompiledModel.io_sizes(model)
+      inputs = Enum.map(ins, &:binary.copy(<<0>>, &1))
+      assert {:ok, bool} = CompiledModel.fully_accelerated(model)
+      assert is_boolean(bool)
+      assert {:ok, {out, metrics}} = CompiledModel.run_with_metrics(model, inputs)
+      assert is_list(out) and is_list(metrics)
+    end
+  end
+
   describe "isolated" do
     @tag timeout: 120_000
     test "runs on its own node and survives that node dying", %{path: path} do
