@@ -16,6 +16,15 @@ defmodule TFLiteElixir.ImageClassification do
   # cannot finish, and the caller sees an exit rather than a slow answer.
   @default_timeout 30_000
 
+  @doc """
+  Start a classifier for `model`, a path to a `.tflite` file or its contents.
+
+  Options, all optional: `:top_k` (1) how many results `predict/3` returns,
+  `:threshold` (0.0) the score below which a result is dropped, `:mean` (128.0)
+  and `:std` (128.0) the input normalisation, `:jobs` (`System.schedulers_online/0`)
+  the interpreter's thread count, `:use_tpu` (false) and `:tpu` ("") to run on a
+  named Edge TPU.
+  """
   @spec start(any, any) :: :ignore | {:error, any} | {:ok, pid}
   def start(model, opts \\ []) do
     GenServer.start(__MODULE__, {model, opts})
@@ -46,6 +55,12 @@ defmodule TFLiteElixir.ImageClassification do
     GenServer.call(pid, {:predict, {:nx_tensor, image_data}, opts}, timeout(opts))
   end
 
+  @doc """
+  Give the classifier its labels, either as a list or as the path to a file
+  holding one label per line.
+
+  Results carry an index until this is set; afterwards they carry the label.
+  """
   @spec set_label(pid, String.t() | [String.t()]) :: :ok
   def set_label(pid, label_file) when is_binary(label_file) do
     GenServer.call(pid, {:set_label, label_file}, @default_timeout)
@@ -55,6 +70,11 @@ defmodule TFLiteElixir.ImageClassification do
     GenServer.call(pid, {:set_label, labels}, @default_timeout)
   end
 
+  @doc """
+  Give the classifier its labels from a file the model itself carries.
+
+  `TFLiteElixir.FlatBufferModel.list_associated_files/1` says what a model has.
+  """
   @spec set_label_from_associated_file(pid(), String.t()) :: :ok | {:error, String.t()}
   def set_label_from_associated_file(pid, associated_filename)
       when is_binary(associated_filename) do
