@@ -136,6 +136,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
 
   deferror(run_with_metrics(server, inputs))
   deferror(run_with_metrics(server, inputs, detail_level))
+  deferror(run_with_metrics(server, inputs, detail_level, timeout))
 
   @doc """
   Every profiling event recorded so far.
