@@ -23,6 +23,14 @@ defmodule TFLiteElixir.ObjectDetection do
           bbox: [integer()]
         }
 
+  @doc """
+  Start a detector for `model`, a path to a `.tflite` file or its contents.
+
+  Options, all optional: `:threshold` (0.4) the score below which a detection is
+  dropped, `:labels` (nil) a list of labels or the path to a file holding one per
+  line, `:jobs` (`System.schedulers_online/0`) the interpreter's thread count,
+  `:use_tpu` (false) and `:tpu` ("") to run on a named Edge TPU.
+  """
   @spec start(any, any) :: :ignore | {:error, any} | {:ok, pid}
   def start(model, opts \\ []) do
     GenServer.start(__MODULE__, {model, opts})
@@ -53,6 +61,10 @@ defmodule TFLiteElixir.ObjectDetection do
     GenServer.call(pid, {:predict, {:nx_tensor, image_data}, opts}, timeout(opts))
   end
 
+  @doc """
+  Give the detector its labels, either as a list or as the path to a file
+  holding one label per line.
+  """
   @spec set_label(pid, String.t() | [String.t()]) :: :ok
   def set_label(pid, label_file) when is_binary(label_file) do
     GenServer.call(pid, {:set_label, label_file}, @default_timeout)

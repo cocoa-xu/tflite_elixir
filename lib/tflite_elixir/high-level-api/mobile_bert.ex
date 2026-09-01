@@ -11,6 +11,12 @@ defmodule TFLiteElixir.MobileBert do
   @output_offset 1
   @predict_answer_count 5
 
+  @doc """
+  Load a MobileBERT question-answering model from `model_file`.
+
+  The vocabulary comes from the model's own `vocab.txt`, so a model without one
+  cannot be loaded here.
+  """
   @spec init(String.t()) :: %T{}
   def init(model_file) do
     model_buffer = File.read!(model_file)
@@ -61,6 +67,12 @@ defmodule TFLiteElixir.MobileBert do
     end
   end
 
+  @doc """
+  Answer `query` from `content`.
+
+  Returns up to five `{score, excerpt}` tuples, best first, where each excerpt is
+  a span of `content` and the scores are a softmax over the spans considered.
+  """
   def run(self = %T{}, query, content) when is_binary(query) and is_binary(content) do
     {features, content_data} = preprocessing(self.vocab_map, query, content)
 

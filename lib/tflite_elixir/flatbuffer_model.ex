@@ -47,6 +47,9 @@ defmodule TFLiteElixir.FlatBufferModel do
     end
   end
 
+  @doc """
+  Same as `build_from_file/2`, but raises rather than returning `{:error, reason}`.
+  """
   def build_from_file!(filename, opts) do
     case build_from_file(filename, opts) do
       {:error, message} when is_list(message) -> raise List.to_string(message)
