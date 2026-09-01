@@ -259,6 +259,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   @spec controlling_process(reference(), pid()) :: :ok | {:error, String.t()}
   def controlling_process(model, pid), do: @erl.controlling_process(model, pid)
 
+  deferror(controlling_process(model))
   deferror(controlling_process(model, pid))
 
   @doc """

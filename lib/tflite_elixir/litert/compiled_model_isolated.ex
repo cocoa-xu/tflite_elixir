@@ -116,6 +116,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
 
   deferror(run_with_metrics(model, inputs))
   deferror(run_with_metrics(model, inputs, detail_level))
+  deferror(run_with_metrics(model, inputs, detail_level, timeout))
 
   @doc "Run the model, waiting at most `timeout`."
   @spec run(pid(), [binary()], timeout()) :: {:ok, [binary()]} | {:error, String.t()}
