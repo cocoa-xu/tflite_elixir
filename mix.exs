@@ -45,18 +45,13 @@ defmodule TFLiteElixir.MixProject do
     ]
   end
 
-  # The deferror/1 macro writes the same three-way case for every raising
-  # variant, so the branch for a charlist reason is dead wherever the wrapped
-  # function only ever returns a binary one. That is a property of the macro, not
-  # of the function it wrapped, and 58 of them buried everything else.
-  # extra_return and missing_return are the pair that does catch something here:
-  # a @spec that is narrower than what the function can actually return.
+  # extra_return and missing_return are the pair that compares a @spec with what
+  # the function can actually return. The default set leaves both off, which is
+  # how six specs here came to deny behaviour the code has.
   defp dialyzer do
     [
       flags: [:extra_return, :missing_return, :error_handling, :unknown],
-      plt_add_apps: [:mix],
-      ignore_warnings: ".dialyzer_ignore.exs",
-      list_unused_filters: true
+      plt_add_apps: [:mix]
     ]
   end
 

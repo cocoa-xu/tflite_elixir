@@ -161,10 +161,9 @@ defmodule TFLiteElixir.Coral do
   - `model`: `FlatBufferModel`. The tflite model.
   - `edgetpu_context`: `reference()`.
 
-    The Edge TPU context, from `TFLiteElixir.Coral::get_edge_tpu_context`.
-
-    If left `nil`, the given interpreter will not resolve an Edge TPU delegate.
-    PoseNet custom op is always supported.
+    The Edge TPU context, from `TFLiteElixir.Coral.get_edge_tpu_context/1`. It is
+    required: an interpreter without one is what `TFLiteElixir.Interpreter.new/1`
+    builds. PoseNet custom op is always supported.
 
   ##### Keyword Parameters (todo)
 

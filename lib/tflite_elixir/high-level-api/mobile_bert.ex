@@ -43,7 +43,12 @@ defmodule TFLiteElixir.MobileBert do
 
     vocabs = String.split(vocab, "\n")
     vocab_map = Map.new(Enum.with_index(vocabs))
-    {:ok, interpreter} = Interpreter.new_from_buffer(model_buffer)
+
+    interpreter =
+      case Interpreter.new_from_buffer(model_buffer) do
+        {:ok, interpreter} -> interpreter
+        {:error, reason} -> raise ArgumentError, "#{model_file} could not be loaded: #{reason}"
+      end
 
     # This was a with/1 over tagged tuples whose else clauses dialyzer could not
     # agree with itself about: OTP 26 called two of them unreachable and OTP 28
@@ -52,11 +57,11 @@ defmodule TFLiteElixir.MobileBert do
     {input_ids_idx, input_mask_idx, segment_ids_idx} = input_indices(interpreter)
     {end_logits_idx, start_logits_idx} = output_indices(interpreter)
 
-    input_ids_tensor = input_tensor_of_expected_shape(interpreter, input_ids_idx)
-    input_mask_tensor = input_tensor_of_expected_shape(interpreter, input_mask_idx)
-    segment_ids_tensor = input_tensor_of_expected_shape(interpreter, segment_ids_idx)
-    end_logits_tensor = output_tensor_of_expected_shape(interpreter, end_logits_idx)
-    start_logits_tensor = output_tensor_of_expected_shape(interpreter, start_logits_idx)
+    input_ids_tensor = tensor_of_expected_shape(interpreter, input_ids_idx, "input")
+    input_mask_tensor = tensor_of_expected_shape(interpreter, input_mask_idx, "input")
+    segment_ids_tensor = tensor_of_expected_shape(interpreter, segment_ids_idx, "input")
+    end_logits_tensor = tensor_of_expected_shape(interpreter, end_logits_idx, "output")
+    start_logits_tensor = tensor_of_expected_shape(interpreter, start_logits_idx, "output")
 
     {:ok,
      %T{
@@ -92,29 +97,19 @@ defmodule TFLiteElixir.MobileBert do
     end
   end
 
-  defp input_tensor_of_expected_shape(interpreter, index) do
+  defp tensor_of_expected_shape(interpreter, index, role) do
     case Interpreter.tensor(interpreter, index) do
-      tensor = %TFLiteTensor{shape: {1, 384}} ->
-        tensor
-
-      _ ->
-        raise RuntimeError, "Unexpected model: Expect input tensor shape to be {1, 384}"
-    end
-  end
-
-  defp output_tensor_of_expected_shape(interpreter, index) do
-    case Interpreter.tensor(interpreter, index) do
-      tensor = %TFLiteTensor{shape: {1, 384}} ->
+      tensor = %TFLiteTensor{shape: {1, @max_seq_len}} ->
         tensor
 
       %TFLiteTensor{} = tensor ->
         raise RuntimeError,
-              "Unexpected model: Expect output tensor (#{tensor.name}) shape to be {1, 384}, " <>
-                "got #{inspect(tensor.shape)}"
+              "Unexpected model: Expect #{role} tensor (#{tensor.name}) shape to be " <>
+                "{1, #{@max_seq_len}}, got #{inspect(tensor.shape)}"
 
       {:error, reason} ->
         raise RuntimeError,
-              "Unexpected model: output tensor #{index} could not be read: #{reason}"
+              "Unexpected model: #{role} tensor #{index} could not be read: #{reason}"
     end
   end
 
@@ -124,6 +119,7 @@ defmodule TFLiteElixir.MobileBert do
   Returns up to five `{score, excerpt}` tuples, best first, where each excerpt is
   a span of `content` and the scores are a softmax over the spans considered.
   """
+  @spec run(%T{}, String.t(), String.t()) :: [{float(), String.t()}]
   def run(self = %T{}, query, content) when is_binary(query) and is_binary(content) do
     {features, content_data} = preprocessing(self.vocab_map, query, content)
 
@@ -186,6 +182,7 @@ defmodule TFLiteElixir.MobileBert do
     segment_ids = segment_ids ++ [1]
 
     {:ok, input_ids} = FullTokenizer.convert_to_id(tokens, vocab_map)
+
     input_mask = List.duplicate(1, Enum.count(input_ids))
 
     # The other way round. content_tokens is already cut to
@@ -263,7 +260,7 @@ defmodule TFLiteElixir.MobileBert do
       |> Enum.map(fn {score, {start_idx, end_idx, _}} ->
         {score, excerpt_words(content_data, start_idx, end_idx)}
       end)
-      |> Enum.reject(&is_nil/1)
+      |> Enum.reject(fn {_score, excerpt} -> is_nil(excerpt) end)
 
     answers
   end

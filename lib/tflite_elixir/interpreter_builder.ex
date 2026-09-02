@@ -77,10 +77,13 @@ defmodule TFLiteElixir.InterpreterBuilder do
 
   @doc """
   Sets the number of CPU threads to use for the interpreter.
-  Returns `true` on success, `{:error, reason}` on error.
+  Returns `:ok` on success, `{:error, reason}` on error.
+
+  `num_threads` follows TfLite: `-1` asks the runtime to choose, `0` means the
+  same as `1`, and anything below `-1` is answered with `{:error, reason}`.
   """
   @spec set_num_threads(reference(), integer()) :: :ok | nif_error()
-  def set_num_threads(self, num_threads) when is_integer(num_threads) and num_threads >= 1 do
+  def set_num_threads(self, num_threads) when is_reference(self) and is_integer(num_threads) do
     :tflite_beam_interpreter_builder.set_num_threads(self, num_threads)
   end
 

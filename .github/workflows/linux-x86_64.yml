@@ -53,6 +53,9 @@ jobs:
           mix deps.get
           # a formatting drift nobody is watching becomes a diff nobody can read
           mix format --check-formatted
+          # two @doc attributes in a row leave the first function undocumented,
+          # and the compiler said so on every build nobody read
+          mix compile --warnings-as-errors
           # tflite_beam's install snippet named a version three releases old
           # because nothing compared it to the one being released
           python3 scripts/check_readme_version.py
