@@ -5,7 +5,7 @@ defmodule TFLiteElixir.Coral do
   with TensorFlow Lite models on [Coral devices](https://coral.ai/products/).
   """
 
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.FlatBufferModel
 

@@ -27,7 +27,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   insist the caller arranged that in advance.
   """
 
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.LiteRT.CompiledModel
 

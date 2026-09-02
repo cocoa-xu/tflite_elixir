@@ -2,7 +2,7 @@ defmodule TFLiteElixir.Interpreter do
   @moduledoc """
   An interpreter for a graph of nodes that input and output from tensors.
   """
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.TFLiteTensor
   alias TFLiteElixir.TFLiteQuantizationParams

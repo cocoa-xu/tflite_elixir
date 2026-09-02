@@ -33,7 +33,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   ordinary build. `platform_support/0` says what this build can reach.
   """
 
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   @typedoc "What to run on, in order of preference."
   @type accelerator :: :cpu | :gpu | :npu

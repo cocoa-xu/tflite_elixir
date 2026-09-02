@@ -147,8 +147,17 @@ defmodule TFLiteElixir.MobileBert do
   # retired handle was a MatchError, or an error from inside Nx, that named
   # neither the step nor the reason. The values take the tensor's own type, so
   # an export with 64 bit inputs is written correctly rather than half filled.
-  defp write!(%TFLiteTensor{type: type} = tensor, values, name) do
+  defp write!(%TFLiteTensor{type: {:s, width} = type} = tensor, values, name)
+       when width in [32, 64] do
     ok!(TFLiteTensor.set_data(tensor, Nx.tensor(values, type: type)), "write #{name}")
+  end
+
+  # Token ids are integers, and a tensor of any other type would either not take
+  # them or raise from inside Nx about a type that has no numbers.
+  defp write!(%TFLiteTensor{type: type}, _values, name) do
+    raise RuntimeError,
+          "MobileBert could not write #{name}: the tensor is #{inspect(type)}, " <>
+            "and token ids need {:s, 32} or {:s, 64}"
   end
 
   defp ok!(:ok, _step), do: :ok
@@ -187,7 +196,7 @@ defmodule TFLiteElixir.MobileBert do
     # content, overrun the sequence, and fail later in set_data.
     max_content_len = @max_seq_len - Enum.count(query_tokens) - 3
 
-    if max_content_len <= 0 do
+    if max_content_len < 0 do
       raise ArgumentError,
             "the query is #{Enum.count(query_tokens)} tokens, which leaves no room for " <>
               "content in the #{@max_seq_len} the model takes"
