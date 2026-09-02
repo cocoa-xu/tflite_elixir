@@ -396,6 +396,35 @@ defmodule TFLiteElixir.Interpreter do
 
   Has to be called before invoking. Without it `cancel/1` is an error.
   """
+  @doc """
+  Which process this interpreter belongs to, or `:undefined` if it is shared.
+  """
+  @spec controlling_process(reference()) :: {:ok, pid()} | :undefined | nif_error()
+  def controlling_process(self) when is_reference(self) do
+    :tflite_beam_interpreter.controlling_process(self)
+  end
+
+  @doc """
+  Hand this interpreter to `pid`.
+
+  Follows `:gen_tcp.controlling_process/2`: while an interpreter belongs to
+  nobody any process may take it, and once it belongs to someone only that
+  process may hand it on. Pass `:undefined` to give it back to nobody. A
+  controlling process that dies releases it, since an interpreter has no
+  equivalent of a socket being closed.
+
+  This is the way out of `"interpreter is in use by another caller"`, which is
+  what a second process otherwise gets.
+  """
+  @spec controlling_process(reference(), pid() | :undefined) :: :ok | nif_error()
+  def controlling_process(self, pid)
+      when is_reference(self) and (is_pid(pid) or pid == :undefined) do
+    :tflite_beam_interpreter.controlling_process(self, pid)
+  end
+
+  deferror(controlling_process(self))
+  deferror(controlling_process(self, pid))
+
   @spec enable_cancellation(reference()) :: :ok | nif_error()
   def enable_cancellation(self) when is_reference(self) do
     :tflite_beam_interpreter.enable_cancellation(self)

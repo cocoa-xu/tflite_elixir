@@ -45,6 +45,47 @@ defmodule TFLiteElixir do
   def source_tree, do: :tflite_beam.source_tree()
 
   @doc """
+  The runtime version string `lite/version.h` carries.
+
+  Hand-maintained upstream and forgotten: the 2.21.0 tree still says `"2.19.0"`.
+  It only applies when the build system injects nothing, which Bazel does and
+  CMake does not, so two builds from different releases are indistinguishable
+  through this value. `tflite_version/0` is the one to match a plugin against.
+  """
+  @spec tflite_runtime_version() :: String.t()
+  def tflite_runtime_version, do: :tflite_beam.tflite_runtime_version()
+
+  @doc """
+  The version of the extension APIs: `c_api_opaque.h`, `common.h`,
+  `builtin_op_data.h` and `builtin_ops.h`.
+
+  Narrower in scope than `tflite_runtime_version/0` but derived from the same
+  stale number, so the same caveat applies.
+  """
+  @spec tflite_extension_apis_version() :: String.t()
+  def tflite_extension_apis_version, do: :tflite_beam.tflite_extension_apis_version()
+
+  @doc """
+  The major schema version this runtime reads model files at.
+
+  Unlike the version strings this one is real: it is defined next to the schema
+  it describes. A model serialised at a different schema version may not load.
+  """
+  @spec tflite_schema_version() :: integer()
+  def tflite_schema_version, do: :tflite_beam.tflite_schema_version()
+
+  @doc """
+  How many dimensions XNNPACK will delegate a tensor with, or `nil` where this
+  build carries no XNNPACK.
+
+  A tensor already wider than this was refused by the delegate to begin with, was
+  therefore never delegated, and can still be reshaped freely. The armv6 and
+  armv7l builds answer `nil`, where nothing is refused.
+  """
+  @spec xnnpack_max_tensor_dims() :: integer() | nil
+  def xnnpack_max_tensor_dims, do: :tflite_beam.xnnpack_max_tensor_dims()
+
+  @doc """
   Prints a dump of what tensors and what nodes are in the interpreter.
 
   Note that this function directly prints to stdout
