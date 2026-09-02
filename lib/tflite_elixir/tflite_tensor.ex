@@ -55,7 +55,7 @@ defmodule TFLiteElixir.TFLiteTensor do
   Given a struct this answers the snapshot; pass `tensor.reference` to ask the
   interpreter, which reports a retired handle rather than a stale type.
   """
-  @spec type(%T{}) :: tensor_type()
+  @spec type(%T{} | {:error, String.t()}) :: tensor_type() | {:error, String.t()}
   # Interpreter.tensor/2 answers {:error, _} when the interpreter is held by
   # another process or the handle has been retired, and that answer flows
   # straight into whichever of these the caller piped it to. Without a clause
@@ -79,7 +79,7 @@ defmodule TFLiteElixir.TFLiteTensor do
   still multiply out to the old byte count while `set_data/2` on the same
   struct answers `{:error, _}`. Pass `tensor.reference` to ask the interpreter.
   """
-  @spec dims(%T{}) :: [integer()]
+  @spec dims(%T{} | {:error, String.t()}) :: [integer()] | {:error, String.t()}
   def dims({:error, reason}), do: {:error, reason}
 
   def dims(%T{shape: shape}), do: Tuple.to_list(shape)
@@ -95,7 +95,7 @@ defmodule TFLiteElixir.TFLiteTensor do
   Given a struct this answers the snapshot; pass `tensor.reference` to ask the
   interpreter, which reports a retired handle rather than a stale shape.
   """
-  @spec shape(%T{}) :: tuple()
+  @spec shape(%T{} | {:error, String.t()}) :: tuple() | {:error, String.t()}
   def shape({:error, reason}), do: {:error, reason}
 
   def shape(%T{shape: shape}), do: shape
@@ -166,7 +166,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   @doc """
   Convert `TFLiteElixir.TFLiteTensor` to `Nx.Tensor`
   """
-  @spec to_nx(reference() | %T{}, Keyword.t()) :: %Nx.Tensor{}
+  @spec to_nx(reference() | %T{} | {:error, String.t()}, Keyword.t()) ::
+          %Nx.Tensor{} | {:error, String.t()}
   def to_nx(self_struct, opts \\ [])
 
   def to_nx({:error, reason}, _opts), do: {:error, reason}

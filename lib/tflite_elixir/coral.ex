@@ -176,7 +176,7 @@ defmodule TFLiteElixir.Coral do
   Returns a dequantized version of the given tensor.
   """
   @spec dequantize_tensor(reference(), non_neg_integer(), term()) ::
-          [number()] | {:error, String.t()}
+          {:ok, [number()]} | {:error, String.t()}
   def dequantize_tensor(interpreter, tensor_index, as_type \\ nil) do
     :tflite_beam_coral.dequantize_tensor(interpreter, tensor_index, as_type)
   end

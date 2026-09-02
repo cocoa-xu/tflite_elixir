@@ -15,12 +15,32 @@ defmodule TFLiteElixir.MobileBert do
   Load a MobileBERT question-answering model from `model_file`.
 
   The vocabulary comes from the model's own `vocab.txt`, so a model without one
-  cannot be loaded here.
+  is refused by name rather than failing somewhere inside the tokenizer.
+
+      {:ok, bert} = TFLiteElixir.MobileBert.init("mobilebert.tflite")
+      answers = TFLiteElixir.MobileBert.run(bert, query, content)
+
   """
-  @spec init(String.t()) :: %T{}
+  @spec init(String.t()) :: {:ok, %T{}}
   def init(model_file) do
     model_buffer = File.read!(model_file)
-    vocab = FlatBufferModel.get_associated_file(model_buffer, "vocab.txt")
+    # get_associated_file/2 answers a map, a string or {:error, _}, and only the
+    # string is a vocabulary. Handing the other two to String.split raised out of
+    # String, naming neither this model nor the file it is missing.
+    vocab =
+      case FlatBufferModel.get_associated_file(model_buffer, "vocab.txt") do
+        text when is_binary(text) ->
+          text
+
+        {:error, reason} ->
+          raise ArgumentError,
+                "#{model_file} carries no vocab.txt, which MobileBert needs: #{reason}"
+
+        other ->
+          raise ArgumentError,
+                "#{model_file} answered #{inspect(other)} for vocab.txt, expected its contents"
+      end
+
     vocabs = String.split(vocab, "\n")
     vocab_map = Map.new(Enum.with_index(vocabs))
     {:ok, interpreter} = Interpreter.new_from_buffer(model_buffer)
