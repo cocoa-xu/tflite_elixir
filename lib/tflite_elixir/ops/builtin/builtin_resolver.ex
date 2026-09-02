@@ -4,7 +4,7 @@ defmodule TFLiteElixir.Ops.Builtin.BuiltinResolver do
   applied by TfLite interpreter by default.
   """
 
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   @type nif_resource_ok :: {:ok, reference()}
   @type nif_error :: {:error, String.t()}

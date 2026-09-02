@@ -138,6 +138,13 @@ defmodule TFLiteElixir.ObjectDetection.Test do
     assert is_binary(reason)
     assert reason =~ "/no/such/model.tflite"
 
+    # a classifier has one output where a detector needs four, and the refusal
+    # used to come back as the exception wrapped in the error tuple
+    classifier = Path.join([__DIR__, "test_data", "mobilenet_v2_1.0_224_inat_bird_quant.tflite"])
+    assert {:error, reason} = ObjectDetection.start(classifier)
+    assert is_binary(reason)
+    assert reason =~ "4 output tensors"
+
     {:ok, pid} = ObjectDetection.start(@model_path)
     assert {:error, reason} = ObjectDetection.predict(pid, "/no/such/image.jpeg")
     assert reason =~ "/no/such/image.jpeg"

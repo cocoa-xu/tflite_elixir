@@ -23,7 +23,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   pressure signal a caller can act on. The default is 64.
   """
 
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.LiteRT.CompiledModel
 

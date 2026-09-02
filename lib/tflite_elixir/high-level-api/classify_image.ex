@@ -112,23 +112,32 @@ defmodule TFLiteElixir.ImageClassification do
         {:stop, "cannot load model #{model_path}: #{reason}"}
 
       %FlatBufferModel{} = model ->
-        tpu_context =
-          if args[:use_tpu] do
-            TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
-          else
-            nil
-          end
-
-        interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
-
-        case Interpreter.allocate_tensors(interpreter) do
-          :ok ->
-            {:ok, %{model_path: model_path, interpreter: interpreter, opts: args, labels: nil}}
-
-          {:error, reason} ->
-            {:stop, "cannot allocate tensors for #{model_path}: #{reason}"}
-        end
+        prepare(model, model_path, args)
     end
+  end
+
+  # Everything raised while the model is set up, a delegate that will not
+  # attach, a thread count the builder refuses, a TPU that is not there, used to
+  # come back from start/2 as the exception wrapped in the error tuple.
+  defp prepare(model, model_path, args) do
+    tpu_context =
+      if args[:use_tpu] do
+        TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
+      else
+        nil
+      end
+
+    interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
+
+    case Interpreter.allocate_tensors(interpreter) do
+      :ok ->
+        {:ok, %{model_path: model_path, interpreter: interpreter, opts: args, labels: nil}}
+
+      {:error, reason} ->
+        {:stop, "cannot allocate tensors for #{model_path}: #{reason}"}
+    end
+  rescue
+    error -> {:stop, "cannot prepare #{model_path}: #{Exception.message(error)}"}
   end
 
   @impl true

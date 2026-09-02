@@ -2,7 +2,7 @@ defmodule TFLiteElixir.Delegate do
   @moduledoc """
   TfLite delegates: graph accelerators an interpreter builder can be given.
   """
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   @type nif_resource_ok :: {:ok, reference()}
   @type nif_error :: {:error, String.t()}

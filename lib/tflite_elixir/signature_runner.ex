@@ -10,7 +10,7 @@ defmodule TFLiteElixir.SignatureRunner do
   it stays usable even if nothing else refers to the interpreter any more. Like the
   interpreter it is not safe to use from more than one process at a time.
   """
-  import TFLiteElixir.Errorize
+  import TFLiteElixir.Errorize, only: [deferror: 1]
 
   @type nif_error :: {:error, String.t()}
 

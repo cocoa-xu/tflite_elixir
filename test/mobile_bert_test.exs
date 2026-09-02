@@ -88,5 +88,7 @@ defmodule TFLiteElixir.MobileBertTest do
 
     error = assert_raise RuntimeError, fn -> MobileBert.run(bert, "hello", "world") end
     assert error.message =~ "input_ids"
+    # a {:u, 8} tensor cannot hold token ids, and Nx said so from inside itself
+    assert error.message =~ "{:u, 8}"
   end
 end
