@@ -45,45 +45,76 @@ defmodule TFLiteElixir.MobileBert do
     vocab_map = Map.new(Enum.with_index(vocabs))
     {:ok, interpreter} = Interpreter.new_from_buffer(model_buffer)
 
-    with {:inputs, {:ok, [input_ids_idx, input_mask_idx, segment_ids_idx]}} <-
-           {:inputs, Interpreter.inputs(interpreter)},
-         {:outputs, {:ok, [end_logits_idx, start_logits_idx]}} <-
-           {:outputs, Interpreter.outputs(interpreter)},
-         {:input_tensor, input_ids_tensor = %TFLiteTensor{shape: {1, 384}}} <-
-           {:input_tensor, Interpreter.tensor(interpreter, input_ids_idx)},
-         {:input_tensor, input_mask_tensor = %TFLiteTensor{shape: {1, 384}}} <-
-           {:input_tensor, Interpreter.tensor(interpreter, input_mask_idx)},
-         {:input_tensor, segment_ids_tensor = %TFLiteTensor{shape: {1, 384}}} <-
-           {:input_tensor, Interpreter.tensor(interpreter, segment_ids_idx)},
-         {:output_tensor, end_logits_tensor = %TFLiteTensor{shape: {1, 384}}} <-
-           {:output_tensor, Interpreter.tensor(interpreter, end_logits_idx)},
-         {:output_tensor, start_logits_tensor = %TFLiteTensor{shape: {1, 384}}} <-
-           {:output_tensor, Interpreter.tensor(interpreter, start_logits_idx)} do
-      {:ok,
-       %T{
-         tensors: %{
-           :input_ids => input_ids_tensor,
-           :input_mask => input_mask_tensor,
-           :segment_ids => segment_ids_tensor,
-           :end_logits => end_logits_tensor,
-           :start_logits => start_logits_tensor
-         },
-         interpreter: interpreter,
-         vocab_map: vocab_map
-       }}
-    else
-      {:inputs, _} ->
+    # This was a with/1 over tagged tuples whose else clauses dialyzer could not
+    # agree with itself about: OTP 26 called two of them unreachable and OTP 28
+    # did not. Each check now says what it wants and raises where it fails, which
+    # both versions can follow.
+    {input_ids_idx, input_mask_idx, segment_ids_idx} = input_indices(interpreter)
+    {end_logits_idx, start_logits_idx} = output_indices(interpreter)
+
+    input_ids_tensor = input_tensor_of_expected_shape(interpreter, input_ids_idx)
+    input_mask_tensor = input_tensor_of_expected_shape(interpreter, input_mask_idx)
+    segment_ids_tensor = input_tensor_of_expected_shape(interpreter, segment_ids_idx)
+    end_logits_tensor = output_tensor_of_expected_shape(interpreter, end_logits_idx)
+    start_logits_tensor = output_tensor_of_expected_shape(interpreter, start_logits_idx)
+
+    {:ok,
+     %T{
+       tensors: %{
+         :input_ids => input_ids_tensor,
+         :input_mask => input_mask_tensor,
+         :segment_ids => segment_ids_tensor,
+         :end_logits => end_logits_tensor,
+         :start_logits => start_logits_tensor
+       },
+       interpreter: interpreter,
+       vocab_map: vocab_map
+     }}
+  end
+
+  defp input_indices(interpreter) do
+    case Interpreter.inputs(interpreter) do
+      {:ok, [input_ids, input_mask, segment_ids]} ->
+        {input_ids, input_mask, segment_ids}
+
+      _ ->
         raise RuntimeError, "Unexpected model: Number of input tensors"
+    end
+  end
 
-      {:input_tensor, _} ->
-        raise RuntimeError, "Unexpected model: Expect input tensor shape to be {1, 384}"
+  defp output_indices(interpreter) do
+    case Interpreter.outputs(interpreter) do
+      {:ok, [end_logits, start_logits]} ->
+        {end_logits, start_logits}
 
-      {:outputs, _} ->
+      _ ->
         raise RuntimeError, "Unexpected model: Number of Output Tensors"
+    end
+  end
 
-      {:output_tensor, tensor} ->
+  defp input_tensor_of_expected_shape(interpreter, index) do
+    case Interpreter.tensor(interpreter, index) do
+      tensor = %TFLiteTensor{shape: {1, 384}} ->
+        tensor
+
+      _ ->
+        raise RuntimeError, "Unexpected model: Expect input tensor shape to be {1, 384}"
+    end
+  end
+
+  defp output_tensor_of_expected_shape(interpreter, index) do
+    case Interpreter.tensor(interpreter, index) do
+      tensor = %TFLiteTensor{shape: {1, 384}} ->
+        tensor
+
+      %TFLiteTensor{} = tensor ->
         raise RuntimeError,
-              "Unexpected model: Expect output tensor (#{tensor.name}) shape to be {1, 384}, got #{inspect(tensor.shape)}"
+              "Unexpected model: Expect output tensor (#{tensor.name}) shape to be {1, 384}, " <>
+                "got #{inspect(tensor.shape)}"
+
+      {:error, reason} ->
+        raise RuntimeError,
+              "Unexpected model: output tensor #{index} could not be read: #{reason}"
     end
   end
 
