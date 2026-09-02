@@ -104,33 +104,77 @@ defmodule TFLiteElixir.ImageClassification do
         end
       end)
 
-    model = load_model(model_path)
+    # A path that named no model answered from start/2 as a FunctionClauseError
+    # wrapped in the error tuple, with the reason two levels down in a stack
+    # frame, and a model whose graph would not prepare as a MatchError.
+    case load_model(model_path) do
+      {:error, reason} ->
+        {:stop, "cannot load model #{model_path}: #{reason}"}
 
-    tpu_context =
-      if args[:use_tpu] do
-        TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
-      else
-        nil
-      end
+      %FlatBufferModel{} = model ->
+        tpu_context =
+          if args[:use_tpu] do
+            TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
+          else
+            nil
+          end
 
-    interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
-    :ok = Interpreter.allocate_tensors(interpreter)
+        interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
 
-    {:ok,
-     %{
-       model_path: model_path,
-       interpreter: interpreter,
-       opts: args,
-       labels: nil
-     }}
+        case Interpreter.allocate_tensors(interpreter) do
+          :ok ->
+            {:ok, %{model_path: model_path, interpreter: interpreter, opts: args, labels: nil}}
+
+          {:error, reason} ->
+            {:stop, "cannot allocate tensors for #{model_path}: #{reason}"}
+        end
+    end
+  end
+
+  @impl true
+  def handle_call({:predict, {input_type, input_data}, pred_opts}, _from, state) do
+    {:reply, classify(input_type, input_data, pred_opts, state), state}
+  rescue
+    # anything raised in here used to take the classifier down, and every caller
+    # queued behind it, for one caller's image or option
+    error -> {:reply, {:error, Exception.message(error)}, state}
+  end
+
+  @impl true
+  def handle_call({:set_label, label_file}, _from, state) when is_binary(label_file) do
+    {:reply, :ok, %{state | labels: load_labels(label_file)}}
+  end
+
+  @impl true
+  def handle_call({:set_label, labels}, _from, state) when is_list(labels) do
+    {:reply, :ok, %{state | labels: labels}}
   end
 
   @impl true
   def handle_call(
-        {:predict, {input_type, input_data}, pred_opts},
+        {:set_label, :associated_file, associated_filename},
         _from,
-        state = %{interpreter: interpreter, opts: opts, labels: labels}
-      ) do
+        state = %{model_path: model_path}
+      )
+      when is_binary(associated_filename) do
+    case TFLiteElixir.FlatBufferModel.get_associated_file(
+           File.read!(model_path),
+           associated_filename
+         ) do
+      content when is_binary(content) ->
+        labels = String.split(content, "\n")
+        {:reply, :ok, %{state | labels: labels}}
+
+      error ->
+        {:reply, error, state}
+    end
+  end
+
+  defp classify(input_type, input_data, pred_opts, %{
+         interpreter: interpreter,
+         opts: opts,
+         labels: labels
+       }) do
     [input_tensor_number | _] = Interpreter.inputs!(interpreter)
     [output_tensor_number | _] = Interpreter.outputs!(interpreter)
     %TFLiteTensor{} = input_tensor = Interpreter.tensor(interpreter, input_tensor_number)
@@ -228,39 +272,9 @@ defmodule TFLiteElixir.ImageClassification do
       end
 
     if opts[:top_k] == 1 do
-      {:reply, Enum.at(results, 0), state}
+      Enum.at(results, 0)
     else
-      {:reply, results, state}
-    end
-  end
-
-  @impl true
-  def handle_call({:set_label, label_file}, _from, state) when is_binary(label_file) do
-    {:reply, :ok, %{state | labels: load_labels(label_file)}}
-  end
-
-  @impl true
-  def handle_call({:set_label, labels}, _from, state) when is_list(labels) do
-    {:reply, :ok, %{state | labels: labels}}
-  end
-
-  @impl true
-  def handle_call(
-        {:set_label, :associated_file, associated_filename},
-        _from,
-        state = %{model_path: model_path}
-      )
-      when is_binary(associated_filename) do
-    case TFLiteElixir.FlatBufferModel.get_associated_file(
-           File.read!(model_path),
-           associated_filename
-         ) do
-      content when is_binary(content) ->
-        labels = String.split(content, "\n")
-        {:reply, :ok, %{state | labels: labels}}
-
-      error ->
-        {:reply, error, state}
+      results
     end
   end
 
@@ -277,11 +291,9 @@ defmodule TFLiteElixir.ImageClassification do
   end
 
   defp load_input(input_path) do
-    with {:ok, input_image} <- StbImage.read_file(input_path) do
-      input_image
-    else
-      {:error, error} ->
-        raise RuntimeError, error
+    case StbImage.read_file(input_path) do
+      {:ok, input_image} -> input_image
+      {:error, error} -> raise RuntimeError, "cannot read image #{input_path}: #{error}"
     end
   end
 

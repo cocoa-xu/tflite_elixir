@@ -41,8 +41,16 @@ defmodule TFLiteElixir.MobileBert do
                 "#{model_file} answered #{inspect(other)} for vocab.txt, expected its contents"
       end
 
-    vocabs = String.split(vocab, "\n")
-    vocab_map = Map.new(Enum.with_index(vocabs))
+    vocab_map = vocab |> String.split(["\r\n", "\n"]) |> Enum.with_index() |> Map.new()
+
+    case Enum.reject(["[CLS]", "[SEP]", "[UNK]"], &Map.has_key?(vocab_map, &1)) do
+      [] ->
+        :ok
+
+      missing ->
+        raise ArgumentError,
+              "#{model_file} has a vocab.txt without #{Enum.join(missing, ", ")}, which MobileBert needs"
+    end
 
     interpreter =
       case Interpreter.new_from_buffer(model_buffer) do
@@ -123,20 +131,36 @@ defmodule TFLiteElixir.MobileBert do
   def run(self = %T{}, query, content) when is_binary(query) and is_binary(content) do
     {features, content_data} = preprocessing(self.vocab_map, query, content)
 
-    :ok = TFLiteTensor.set_data(self.tensors.input_ids, Nx.tensor(features.input_ids, type: :s32))
+    write!(self.tensors.input_ids, features.input_ids, "input_ids")
+    write!(self.tensors.input_mask, features.input_mask, "input_mask")
+    write!(self.tensors.segment_ids, features.segment_ids, "segment_ids")
+    ok!(Interpreter.invoke(self.interpreter), "run the model")
 
-    :ok =
-      TFLiteTensor.set_data(self.tensors.input_mask, Nx.tensor(features.input_mask, type: :s32))
-
-    :ok =
-      TFLiteTensor.set_data(self.tensors.segment_ids, Nx.tensor(features.segment_ids, type: :s32))
-
-    :ok = Interpreter.invoke(self.interpreter)
-
-    end_logits = Nx.squeeze(TFLiteTensor.to_nx(self.tensors.end_logits))
-    start_logits = Nx.squeeze(TFLiteTensor.to_nx(self.tensors.start_logits))
+    end_logits = Nx.squeeze(read!(self.tensors.end_logits, "end_logits"))
+    start_logits = Nx.squeeze(read!(self.tensors.start_logits, "start_logits"))
 
     postprocessing(start_logits, end_logits, content_data)
+  end
+
+  # Every step here was matched against :ok or handed straight to Nx, so an
+  # interpreter another process was using, an input of another type, or a
+  # retired handle was a MatchError, or an error from inside Nx, that named
+  # neither the step nor the reason. The values take the tensor's own type, so
+  # an export with 64 bit inputs is written correctly rather than half filled.
+  defp write!(%TFLiteTensor{type: type} = tensor, values, name) do
+    ok!(TFLiteTensor.set_data(tensor, Nx.tensor(values, type: type)), "write #{name}")
+  end
+
+  defp ok!(:ok, _step), do: :ok
+
+  defp ok!({:error, reason}, step),
+    do: raise(RuntimeError, "MobileBert could not #{step}: #{reason}")
+
+  defp read!(tensor, name) do
+    case TFLiteTensor.to_nx(tensor) do
+      %Nx.Tensor{} = logits -> logits
+      {:error, reason} -> raise RuntimeError, "MobileBert could not read #{name}: #{reason}"
+    end
   end
 
   @doc false
@@ -158,8 +182,17 @@ defmodule TFLiteElixir.MobileBert do
 
     content_tokens = List.flatten(content_tokens)
 
-    # -3 accounts for [CLS], [SEP] and [SEP].
+    # -3 accounts for [CLS], [SEP] and [SEP]. Enum.take/2 with a negative count
+    # takes from the end, so a query past the limit used to keep the tail of the
+    # content, overrun the sequence, and fail later in set_data.
     max_content_len = @max_seq_len - Enum.count(query_tokens) - 3
+
+    if max_content_len <= 0 do
+      raise ArgumentError,
+            "the query is #{Enum.count(query_tokens)} tokens, which leaves no room for " <>
+              "content in the #{@max_seq_len} the model takes"
+    end
+
     content_tokens = Enum.take(content_tokens, max_content_len)
 
     # Start of generating the `InputFeatures`.
@@ -181,7 +214,11 @@ defmodule TFLiteElixir.MobileBert do
     tokens = tokens ++ ["[SEP]"]
     segment_ids = segment_ids ++ [1]
 
-    {:ok, input_ids} = FullTokenizer.convert_to_id(tokens, vocab_map)
+    input_ids =
+      case FullTokenizer.convert_to_id(tokens, vocab_map) do
+        {:ok, ids} -> ids
+        {:error, reason} -> raise ArgumentError, "the vocabulary cannot map the text: #{reason}"
+      end
 
     input_mask = List.duplicate(1, Enum.count(input_ids))
 
@@ -233,7 +270,10 @@ defmodule TFLiteElixir.MobileBert do
               start_index = content_data.token_idx_to_word_idx_mapping[start + @output_offset]
               end_index = content_data.token_idx_to_word_idx_mapping[end_idx + @output_offset]
 
-              if start_index < end_index do
+              # A position on [CLS], the query, a [SEP] or the padding has no
+              # word, and nil compares greater than every integer, so a span
+              # ending there passed and excerpt_words/3 did arithmetic on nil.
+              if is_integer(start_index) and is_integer(end_index) and start_index < end_index do
                 [
                   {start_index, end_index,
                    Nx.to_number(Nx.add(start_logits[start], end_logits[end_idx]))}

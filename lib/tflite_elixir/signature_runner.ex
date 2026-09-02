@@ -146,7 +146,9 @@ defmodule TFLiteElixir.SignatureRunner do
   @spec predict(reference(), %{String.t() => binary()}) ::
           {:ok, %{String.t() => binary()}} | nif_error()
   def predict(self, inputs) when is_reference(self) and is_map(inputs) do
-    with :ok <- allocate_tensors(self),
+    with {:ok, expected} <- input_names(self),
+         :ok <- check_inputs(expected, inputs),
+         :ok <- allocate_tensors(self),
          :ok <- write_inputs(self, inputs),
          :ok <- invoke(self),
          {:ok, names} <- output_names(self) do
@@ -155,6 +157,28 @@ defmodule TFLiteElixir.SignatureRunner do
   end
 
   deferror(predict(self, inputs))
+
+  # An input left out of the map was never noticed: its tensor kept whatever the
+  # call before had written and the model answered from that as though it were
+  # new. A key that was not a string, or a value that was not a binary, raised
+  # from a private function instead of saying which.
+  defp check_inputs(expected, inputs) do
+    wrong = for {name, data} <- inputs, not (is_binary(name) and is_binary(data)), do: name
+    missing = expected -- Map.keys(inputs)
+
+    cond do
+      wrong != [] ->
+        {:error,
+         "inputs are named by a string and given as a binary, which these are not: " <>
+           Enum.map_join(wrong, ", ", &inspect/1)}
+
+      missing != [] ->
+        {:error, "missing inputs: #{Enum.join(missing, ", ")}"}
+
+      true ->
+        :ok
+    end
+  end
 
   defp write_inputs(self, inputs) do
     Enum.reduce_while(inputs, :ok, fn {name, data}, :ok ->

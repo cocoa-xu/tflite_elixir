@@ -519,102 +519,92 @@ defmodule TFLiteElixir.Interpreter do
   defp reason_of(reason) when is_binary(reason), do: reason
   defp reason_of(other), do: inspect(other)
 
+  # One input is a list of one, so a bare binary or tensor given to a model with
+  # several inputs gets the length mismatch by name. An Nx tensor is a map, and
+  # used to fall into the clause below it, which then reported every input as
+  # missing.
   defp fill_input(interpreter, input_tensors, input)
-       when is_list(input_tensors) and is_list(input) do
-    if length(input_tensors) == length(input) do
-      fill_results =
-        Enum.zip_with([input_tensors, input], fn [input_tensor_index, input_data] ->
-          fill_input(interpreter, input_tensor_index, input_data)
-        end)
+       when is_binary(input) or is_struct(input, Nx.Tensor) do
+    fill_input(interpreter, input_tensors, [input])
+  end
 
-      case Enum.reject(fill_results, &(&1 == :ok)) do
-        [] -> :ok
-        failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
-      end
+  defp fill_input(interpreter, input_tensors, input) when is_list(input) do
+    if length(input_tensors) == length(input) do
+      input_tensors
+      |> Enum.zip(input)
+      |> Enum.map(fn {index, data} -> fill_indexed(interpreter, index, data) end)
+      |> collect_failures()
     else
       {:error,
        "length mismatch: there are #{length(input_tensors)} input tensors while the input list has #{length(input)} elements"}
     end
   end
 
-  # The @spec has allowed a bare binary since this was written and there was no
-  # clause for it, so every caller who took the documentation at its word got a
-  # FunctionClauseError. The Erlang layer has had this clause all along.
-  defp fill_input(interpreter, input_tensors, input)
-       when is_list(input_tensors) and is_binary(input) do
-    fill_input(interpreter, input_tensors, [input])
+  defp fill_input(interpreter, input_tensors, input) when is_map(input) do
+    input_tensors
+    |> Enum.map(fn index ->
+      case Interpreter.tensor(interpreter, index) do
+        %TFLiteTensor{name: name} = tensor ->
+          case Map.fetch(input, name) do
+            {:ok, data} -> fill_tensor(tensor, index, data)
+            :error -> {:error, "missing input data for tensor `#{name}`, tensor index: #{index}"}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end)
+    |> collect_failures()
   end
 
-  defp fill_input(interpreter, input_tensors, %Nx.Tensor{} = input)
-       when is_list(input_tensors) and length(input_tensors) == 1 do
-    [tensor_index] = input_tensors
-    fill_input(interpreter, tensor_index, input)
+  # The Erlang predict/2 has answered these three by name all along. This port
+  # carried the clauses that succeed and none that refuse, so anything else
+  # raised FunctionClauseError from a private function.
+  defp fill_input(_interpreter, _input_tensors, input) do
+    {:error,
+     "input must be a binary, an Nx tensor, a list of them, or a map of tensor names to them, and this is #{inspect(input)}"}
   end
 
-  defp fill_input(interpreter, input_tensor_index, %Nx.Tensor{} = input)
-       when is_integer(input_tensor_index) do
-    %TFLiteTensor{} = tensor = Interpreter.tensor(interpreter, input_tensor_index)
+  defp fill_indexed(interpreter, index, data) do
+    case Interpreter.tensor(interpreter, index) do
+      %TFLiteTensor{} = tensor -> fill_tensor(tensor, index, data)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-    with {:match_type, _, _, true} <-
-           {:match_type, tensor.type, Nx.type(input), tensor.type == Nx.type(input)},
-         {:match_shape, _, _, true} <-
-           {:match_shape, tensor.shape, Nx.shape(input),
-            tensor.shape == Nx.shape(input) or
-              TFLiteTensor.dims(tensor) == [1 | Tuple.to_list(Nx.shape(input))]} do
-      TFLiteTensor.set_data(tensor, Nx.to_binary(input))
-    else
-      {:match_type, tensor_type, input_type, _} ->
+  # An Nx tensor carries a type and a shape, so both are held against the
+  # tensor's before its bytes go in. A map value skipped both checks, so a tensor
+  # of the wrong type but the right byte count was written and run unremarked.
+  defp fill_tensor(%TFLiteTensor{} = tensor, index, %Nx.Tensor{} = input) do
+    cond do
+      tensor.type != Nx.type(input) ->
         {:error,
-         "input data type, #{inspect(input_type)}, does not match the data type of the tensor, #{inspect(tensor_type)}, tensor index: #{input_tensor_index}"}
+         "input data type, #{inspect(Nx.type(input))}, does not match the data type of the tensor, #{inspect(tensor.type)}, tensor index: #{index}"}
 
-      {:match_shape, tensor_shape, input_shape, _} ->
+      tensor.shape != Nx.shape(input) and
+          TFLiteTensor.dims(tensor) != [1 | Tuple.to_list(Nx.shape(input))] ->
         {:error,
-         "input data shape, #{inspect(input_shape)}, does not match the shape type of the tensor, #{inspect(tensor_shape)}, tensor index: #{input_tensor_index}"}
+         "input data shape, #{inspect(Nx.shape(input))}, does not match the shape type of the tensor, #{inspect(tensor.shape)}, tensor index: #{index}"}
+
+      true ->
+        TFLiteTensor.set_data(tensor, Nx.to_binary(input))
     end
   end
 
-  defp fill_input(interpreter, input_tensor_index, input)
-       when is_integer(input_tensor_index) and is_binary(input) do
-    case Interpreter.tensor(interpreter, input_tensor_index) do
-      %TFLiteTensor{} = tensor ->
-        TFLiteTensor.set_data(tensor, input)
-
-      error ->
-        error
-    end
-  end
-
-  defp fill_input(interpreter, input_tensors, input)
-       when is_list(input_tensors) and is_map(input) do
-    ret =
-      Enum.map(input_tensors, fn input_tensor_index ->
-        %TFLiteTensor{} = out_tensor = Interpreter.tensor(interpreter, input_tensor_index)
-        name = out_tensor.name
-        data = Map.get(input, name, nil)
-
-        if data do
-          # was: fill_input(out_tensor, data); :ok
-          # which ran inference on a tensor that had not been written
-          fill_input(out_tensor, data)
-        else
-          "missing input data for tensor `#{name}`, tensor index: #{input_tensor_index}"
-        end
-      end)
-      |> Enum.reject(fn r -> r == :ok end)
-
-    case ret do
-      [] -> :ok
-      failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
-    end
-  end
-
-  defp fill_input(%TFLiteTensor{} = tensor, input)
-       when is_binary(input) do
+  defp fill_tensor(%TFLiteTensor{} = tensor, _index, input) when is_binary(input) do
     TFLiteTensor.set_data(tensor, input)
   end
 
-  defp fill_input(%TFLiteTensor{} = tensor, %Nx.Tensor{} = input) do
-    TFLiteTensor.set_data(tensor, Nx.to_binary(input))
+  defp fill_tensor(%TFLiteTensor{}, index, input) do
+    {:error,
+     "input for tensor index #{index} is #{inspect(input)}, which is neither binary data nor an Nx tensor"}
+  end
+
+  defp collect_failures(results) do
+    case Enum.reject(results, &(&1 == :ok)) do
+      [] -> :ok
+      failures -> {:error, failures |> Enum.map(&reason_of/1) |> Enum.join("; ")}
+    end
   end
 
   # One name for both shapes left dialyzer unable to tell which a caller got

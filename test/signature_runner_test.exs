@@ -31,6 +31,27 @@ defmodule TFLiteElixir.SignatureRunner.Test do
     assert [@out_name] == SignatureRunner.output_names!(runner)
   end
 
+  # write_inputs walked whatever map it was given, so a key that was not a
+  # string or a value that was not a binary raised from a private function, and
+  # an input left out of the map was never noticed: the model ran on whatever
+  # the tensor held from the call before and answered as though it were new.
+  test "predict/2 refuses an input that is missing, misnamed or not bytes" do
+    runner = runner()
+    input = File.read!(@input_path)
+
+    assert {:error, reason} = SignatureRunner.predict(runner, %{})
+    assert reason =~ "missing"
+    assert reason =~ @in_name
+
+    assert {:error, reason} = SignatureRunner.predict(runner, %{@in_name => :nope})
+    assert reason =~ @in_name
+
+    assert {:error, reason} = SignatureRunner.predict(runner, %{some_atom: input})
+    assert reason =~ "some_atom"
+
+    assert {:ok, %{@out_name => _}} = SignatureRunner.predict(runner, %{@in_name => input})
+  end
+
   test "a signature runs the model and agrees with the interpreter" do
     input = File.read!(@input_path)
     golden = File.read!(@golden_path)

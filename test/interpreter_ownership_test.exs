@@ -50,6 +50,53 @@ defmodule TFLiteElixir.InterpreterOwnershipTest do
     assert [%Nx.Tensor{}] = Interpreter.predict(interpreter, whole)
   end
 
+  # The Erlang predict/2 answers every one of these by name. The port carried
+  # the happy clauses and not the refusals, so each of them was a
+  # FunctionClauseError from a private function, and a map value that was an Nx
+  # tensor of the wrong type but the right byte count was written unchecked.
+  test "input that is not tensor data is refused by name, whichever way it arrives" do
+    interpreter = Interpreter.new!(@quantised)
+    {:ok, [index]} = Interpreter.inputs(interpreter)
+    name = Interpreter.tensor(interpreter, index).name
+
+    assert {:error, reason} = Interpreter.predict(interpreter, :nope)
+    assert reason =~ "input must be"
+    assert reason =~ ":nope"
+
+    assert {:error, reason} = Interpreter.predict(interpreter, [[1.0, 2.0]])
+    assert reason =~ "tensor index 0"
+    assert reason =~ "[1.0, 2.0]"
+
+    assert {:error, reason} = Interpreter.predict(interpreter, %{name => :nope})
+    assert reason =~ "tensor index 0"
+    assert reason =~ ":nope"
+
+    same_bytes_wrong_type = Nx.broadcast(Nx.tensor(1, type: :s8), {1, 224, 224, 3})
+
+    assert {:error, reason} = Interpreter.predict(interpreter, %{name => same_bytes_wrong_type})
+    assert reason =~ "does not match the data type of the tensor, {:u, 8}"
+
+    whole = whole_input()
+    assert [%Nx.Tensor{}] = Interpreter.predict(interpreter, %{name => whole})
+
+    assert [%Nx.Tensor{}] =
+             Interpreter.predict(
+               interpreter,
+               whole |> Nx.from_binary(:u8) |> Nx.reshape({1, 224, 224, 3})
+             )
+  end
+
+  test "printing the state of a claimed interpreter from elsewhere is refused, not swallowed" do
+    interpreter = Interpreter.new!(@tiny)
+    :ok = Interpreter.controlling_process(interpreter, self())
+
+    assert {:error, reason} =
+             Task.await(Task.async(fn -> TFLiteElixir.print_interpreter_state(interpreter) end))
+
+    assert reason =~ "belongs to another process"
+    assert nil == TFLiteElixir.print_interpreter_state(interpreter)
+  end
+
   # TfLite defines -1 as "let the runtime choose" and 0 as 1, the Erlang side
   # takes both and says so, and the guards here refused everything below 1.
   test "set_num_threads/2 takes the -1 that asks the runtime to choose" do

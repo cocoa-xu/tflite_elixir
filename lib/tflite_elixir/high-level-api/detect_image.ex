@@ -95,29 +95,40 @@ defmodule TFLiteElixir.ObjectDetection do
         end
       end)
 
-    model = load_model(model_path)
+    # A path that named no model answered from start/2 as a FunctionClauseError
+    # wrapped in the error tuple, with the reason two levels down in a stack
+    # frame, and a model whose graph would not prepare as a MatchError.
+    case load_model(model_path) do
+      {:error, reason} ->
+        {:stop, "cannot load model #{model_path}: #{reason}"}
 
-    tpu_context =
-      if args[:use_tpu] do
-        TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
-      else
-        nil
-      end
+      %FlatBufferModel{} = model ->
+        tpu_context =
+          if args[:use_tpu] do
+            TFLiteElixir.Coral.get_edge_tpu_context!(device: args[:tpu])
+          else
+            nil
+          end
 
-    interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
-    :ok = Interpreter.allocate_tensors(interpreter)
+        interpreter = make_interpreter(model, args[:jobs], args[:use_tpu], tpu_context)
 
-    if Enum.count(Interpreter.outputs!(interpreter)) != 4 do
-      raise ArgumentError, "Object detection models should have 4 output tensors"
+        with :ok <- Interpreter.allocate_tensors(interpreter),
+             {:ok, outputs} <- Interpreter.outputs(interpreter) do
+          if Enum.count(outputs) != 4 do
+            raise ArgumentError, "Object detection models should have 4 output tensors"
+          end
+
+          {:ok,
+           %{
+             model_path: model_path,
+             interpreter: interpreter,
+             opts: args,
+             labels: load_labels(args[:labels])
+           }}
+        else
+          {:error, reason} -> {:stop, "cannot prepare #{model_path}: #{reason}"}
+        end
     end
-
-    {:ok,
-     %{
-       model_path: model_path,
-       interpreter: interpreter,
-       opts: args,
-       labels: load_labels(args[:labels])
-     }}
   end
 
   @impl true
@@ -136,6 +147,10 @@ defmodule TFLiteElixir.ObjectDetection do
       end
 
     {:reply, detect(interpreter, input_image, labels, opts[:threshold]), state}
+  rescue
+    # anything raised in here used to take the detector down, and every caller
+    # queued behind it, for one caller's image or option
+    error -> {:reply, {:error, Exception.message(error)}, state}
   end
 
   @impl true
@@ -314,7 +329,10 @@ defmodule TFLiteElixir.ObjectDetection do
   end
 
   defp load_model(model_path) do
-    FlatBufferModel.build_from_buffer(File.read!(model_path))
+    case File.read(model_path) do
+      {:ok, buffer} -> FlatBufferModel.build_from_buffer(buffer)
+      {:error, reason} -> {:error, "cannot read model file: #{:file.format_error(reason)}"}
+    end
   end
 
   defp load_input(nil) do
@@ -322,10 +340,9 @@ defmodule TFLiteElixir.ObjectDetection do
   end
 
   defp load_input(input_path) do
-    with {:ok, input_image} <- StbImage.read_file(input_path) do
-      input_image
-    else
-      {:error, error} -> raise RuntimeError, error
+    case StbImage.read_file(input_path) do
+      {:ok, input_image} -> input_image
+      {:error, error} -> raise RuntimeError, "cannot read image #{input_path}: #{error}"
     end
   end
 

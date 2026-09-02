@@ -145,6 +145,15 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Test do
       Server.stop(server)
     end
 
+    # Documented as answering false rather than an error, and a server that is
+    # gone answered with an exit instead.
+    test "fully_accelerated?/1 answers false for a server that is gone" do
+      gone = spawn(fn -> :ok end)
+      ref = Process.monitor(gone)
+      assert_receive {:DOWN, ^ref, :process, ^gone, _}
+      assert false == Server.fully_accelerated?(gone)
+    end
+
     test "a raising callback costs the call, not the model", %{env: env, path: path} do
       {:ok, server} = Server.start_link(env, path, accelerators: [:cpu])
       assert {:error, _} = Server.with(server, fn _ -> raise "boom" end)

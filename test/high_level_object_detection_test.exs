@@ -129,4 +129,19 @@ defmodule TFLiteElixir.ObjectDetection.Test do
 
     assert [%{class_id: 16}] = ObjectDetection.predict(pid, @input_path, timeout: :infinity)
   end
+
+  # A wrong path is the first mistake anyone makes, and it answered with a
+  # FunctionClauseError wrapped in the error tuple from start/2, or took the
+  # server down from predict/3 so every later caller got :noproc.
+  test "a model or image that cannot be read is named, and the detector survives it" do
+    assert {:error, reason} = ObjectDetection.start("/no/such/model.tflite")
+    assert is_binary(reason)
+    assert reason =~ "/no/such/model.tflite"
+
+    {:ok, pid} = ObjectDetection.start(@model_path)
+    assert {:error, reason} = ObjectDetection.predict(pid, "/no/such/image.jpeg")
+    assert reason =~ "/no/such/image.jpeg"
+    assert Process.alive?(pid)
+    assert [%{class_id: 16} | _] = ObjectDetection.predict(pid, @input_path)
+  end
 end
