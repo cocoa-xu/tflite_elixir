@@ -27,7 +27,7 @@ defmodule TFLiteElixir.Interpreter.Server do
   - `:num_threads`. Passed to the builder before the interpreter is built, so it
     reaches the default XNNPACK delegate as well.
   """
-  @spec start_link(binary() | list(), Keyword.t()) :: {:ok, pid()} | {:error, term()}
+  @spec start_link(binary() | list(), Keyword.t()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(model_path, opts \\ []) do
     :tflite_beam_interpreter_server.start_link(model_path, opts)
   end
@@ -35,7 +35,7 @@ defmodule TFLiteElixir.Interpreter.Server do
   @doc """
   Start an interpreter process outside a supervision tree.
   """
-  @spec start(binary() | list(), Keyword.t()) :: {:ok, pid()} | {:error, term()}
+  @spec start(binary() | list(), Keyword.t()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(model_path, opts \\ []) do
     :tflite_beam_interpreter_server.start(model_path, opts)
   end
@@ -44,7 +44,7 @@ defmodule TFLiteElixir.Interpreter.Server do
   Feed, run and read back, as one operation.
   """
   @spec predict(pid(), binary() | list() | map(), timeout()) ::
-          [binary() | {:error, String.t()}] | {:error, String.t()}
+          [binary()] | {:error, String.t()}
   def predict(server, input, timeout \\ @default_timeout) do
     :tflite_beam_interpreter_server.predict(server, input, timeout)
   end
@@ -55,7 +55,8 @@ defmodule TFLiteElixir.Interpreter.Server do
   For the sequences `predict/3` does not cover -- resizing an input and
   reallocating, say, or driving a signature runner. The function runs in the
   server process, so nothing else touches the interpreter while it does, and it
-  should return promptly for the same reason.
+  should return promptly for the same reason. One that raises is answered to its
+  caller as `{:error, reason}` and costs nobody else anything.
 
       TFLiteElixir.Interpreter.Server.run(server, fn interpreter ->
         TFLiteElixir.Interpreter.tensors_size(interpreter)

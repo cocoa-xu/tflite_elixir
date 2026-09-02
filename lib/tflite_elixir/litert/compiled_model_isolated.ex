@@ -54,12 +54,12 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
 
   - `:peer_args`. Extra arguments for the node itself, e.g. `["+sbwt", "none"]`.
   """
-  @spec start_link(opts()) :: {:ok, pid()} | {:error, term()}
+  @spec start_link(opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(opts) when is_list(opts), do: @erl.start_link(Map.new(opts))
   def start_link(opts) when is_map(opts), do: @erl.start_link(opts)
 
   @doc "As `start_link/1`, with options for the gen_server itself."
-  @spec start_link(opts(), list()) :: {:ok, pid()} | {:error, term()}
+  @spec start_link(opts(), list()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(opts, gen_opts) when is_list(opts) do
     @erl.start_link(Map.new(opts), gen_opts)
   end
@@ -67,12 +67,12 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   def start_link(opts, gen_opts) when is_map(opts), do: @erl.start_link(opts, gen_opts)
 
   @doc "Start one outside a supervision tree."
-  @spec start(opts()) :: {:ok, pid()} | {:error, term()}
+  @spec start(opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(opts) when is_list(opts), do: @erl.start(Map.new(opts))
   def start(opts) when is_map(opts), do: @erl.start(opts)
 
   @doc "As `start/1`, with options for the gen_server itself."
-  @spec start(opts(), list()) :: {:ok, pid()} | {:error, term()}
+  @spec start(opts(), list()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(opts, gen_opts) when is_list(opts), do: @erl.start(Map.new(opts), gen_opts)
   def start(opts, gen_opts) when is_map(opts), do: @erl.start(opts, gen_opts)
 
