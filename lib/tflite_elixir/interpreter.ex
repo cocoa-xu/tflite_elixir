@@ -10,24 +10,6 @@ defmodule TFLiteElixir.Interpreter do
 
   @type nif_resource_ok :: {:ok, reference()}
   @type nif_error :: {:error, String.t()}
-  @type tensor_type ::
-          :no_type
-          | {:f, 32}
-          | {:s, 32}
-          | {:u, 8}
-          | {:s, 64}
-          | :string
-          | :bool
-          | {:s, 16}
-          | {:c, 64}
-          | {:s, 8}
-          | {:f, 16}
-          | {:f, 64}
-          | {:c, 128}
-          | {:u, 64}
-          | :resource
-          | :variant
-          | {:u, 32}
 
   @doc """
   New interpreter
@@ -107,7 +89,7 @@ defmodule TFLiteElixir.Interpreter do
   tensor `42`
   """
   @spec get_input_name(reference(), non_neg_integer()) :: {:ok, String.t()} | nif_error()
-  def get_input_name(self, index) when is_reference(self) and index >= 0 do
+  def get_input_name(self, index) when is_reference(self) and is_integer(index) and index >= 0 do
     :tflite_beam_interpreter.get_input_name(self, index)
   end
 
@@ -141,7 +123,8 @@ defmodule TFLiteElixir.Interpreter do
   tensor `42`
   """
   @spec get_output_name(reference(), non_neg_integer()) :: {:ok, String.t()} | nif_error()
-  def get_output_name(self, index) when is_reference(self) and index >= 0 do
+  def get_output_name(self, index)
+      when is_reference(self) and is_integer(index) and index >= 0 do
     :tflite_beam_interpreter.get_output_name(self, index)
   end
 
@@ -180,7 +163,8 @@ defmodule TFLiteElixir.Interpreter do
   if `inputs/1` returns `[42, 314]`, then `42` should be passed here to get tensor `42`.
   """
   @spec tensor(reference(), non_neg_integer()) :: %TFLiteTensor{} | nif_error()
-  def tensor(self, tensor_index) when is_reference(self) and tensor_index >= 0 do
+  def tensor(self, tensor_index)
+      when is_reference(self) and is_integer(tensor_index) and tensor_index >= 0 do
     case :tflite_beam_interpreter.tensor(self, tensor_index) do
       {:tflite_beam_tensor, name, index, shape, shape_signature, type,
        {:tflite_beam_quantization_params, scale, zero_point, quantized_dimension},
@@ -224,8 +208,8 @@ defmodule TFLiteElixir.Interpreter do
   """
   @spec input_tensor(reference(), non_neg_integer(), binary()) :: :ok | nif_error()
   def input_tensor(self, index, data)
-      when is_reference(self) and index >= 0 and is_binary(data) do
-    :tflite_beam_nif.interpreter_input_tensor(self, index, data)
+      when is_reference(self) and is_integer(index) and index >= 0 and is_binary(data) do
+    :tflite_beam_interpreter.input_tensor(self, index, data)
   end
 
   deferror(input_tensor(self, index, data))
@@ -239,8 +223,8 @@ defmodule TFLiteElixir.Interpreter do
   """
   @spec output_tensor(reference(), non_neg_integer()) ::
           {:ok, binary()} | nif_error()
-  def output_tensor(self, index) when is_reference(self) and index >= 0 do
-    :tflite_beam_nif.interpreter_output_tensor(self, index)
+  def output_tensor(self, index) when is_reference(self) and is_integer(index) and index >= 0 do
+    :tflite_beam_interpreter.output_tensor(self, index)
   end
 
   deferror(output_tensor(self, index))
@@ -280,9 +264,12 @@ defmodule TFLiteElixir.Interpreter do
   InterpreterBuilder.set_num_threads(builder, ...)
   assert :ok == InterpreterBuilder.build!(builder, interpreter)
   ```
+
+  `num_threads` follows TfLite: `-1` asks the runtime to choose, `0` means the
+  same as `1`, and anything below `-1` is answered with `{:error, reason}`.
   """
   @spec set_num_threads(reference(), integer()) :: :ok | nif_error()
-  def set_num_threads(self, num_threads) when is_integer(num_threads) and num_threads >= 1 do
+  def set_num_threads(self, num_threads) when is_reference(self) and is_integer(num_threads) do
     :tflite_beam_interpreter.set_num_threads(self, num_threads)
   end
 
@@ -392,11 +379,6 @@ defmodule TFLiteElixir.Interpreter do
   end
 
   @doc """
-  Allow a running `invoke/1` to be cancelled.
-
-  Has to be called before invoking. Without it `cancel/1` is an error.
-  """
-  @doc """
   Which process this interpreter belongs to, or `:undefined` if it is shared.
   """
   @spec controlling_process(reference()) :: {:ok, pid()} | :undefined | nif_error()
@@ -413,8 +395,10 @@ defmodule TFLiteElixir.Interpreter do
   controlling process that dies releases it, since an interpreter has no
   equivalent of a socket being closed.
 
-  This is the way out of `"interpreter is in use by another caller"`, which is
-  what a second process otherwise gets.
+  Two processes whose calls overlap on an unclaimed interpreter get
+  `{:error, "interpreter is already in use by another process"}`, and once it is
+  claimed every other process gets `{:error, "interpreter belongs to another
+  process"}` whether their calls overlap or not.
   """
   @spec controlling_process(reference(), pid() | :undefined) :: :ok | nif_error()
   def controlling_process(self, pid)
@@ -425,6 +409,11 @@ defmodule TFLiteElixir.Interpreter do
   deferror(controlling_process(self))
   deferror(controlling_process(self, pid))
 
+  @doc """
+  Allow a running `invoke/1` to be cancelled.
+
+  Has to be called before invoking. Without it `cancel/1` is an error.
+  """
   @spec enable_cancellation(reference()) :: :ok | nif_error()
   def enable_cancellation(self) when is_reference(self) do
     :tflite_beam_interpreter.enable_cancellation(self)
@@ -496,9 +485,18 @@ defmodule TFLiteElixir.Interpreter do
   @doc """
   Fill input data to corresponding input tensor of the interpreter,
   call `Interpreter.invoke` and return output tensor(s)
+
+  Each input is a binary of the tensor's bytes or an `Nx.Tensor` of its type
+  and shape. A model with one input takes it bare; otherwise pass them as a list
+  in the order of `inputs/1`, or as a map from tensor name to data.
   """
-  @spec predict(reference(), binary() | [binary()] | map()) ::
-          Nx.Tensor.t() | [Nx.Tensor.t()] | nif_error()
+  @spec predict(
+          reference(),
+          binary()
+          | Nx.Tensor.t()
+          | [binary() | Nx.Tensor.t()]
+          | %{String.t() => binary() | Nx.Tensor.t()}
+        ) :: [Nx.Tensor.t()] | nif_error()
   def predict(interpreter, input) do
     with {:ok, input_tensors} <- Interpreter.inputs(interpreter),
          {:ok, output_tensors} <- Interpreter.outputs(interpreter),
@@ -508,7 +506,7 @@ defmodule TFLiteElixir.Interpreter do
          # failed run handed back the answer from the run before, as a perfectly
          # ordinary Nx tensor with no way for the caller to tell.
          :ok <- Interpreter.invoke(interpreter) do
-      fetch_output(interpreter, output_tensors)
+      fetch_outputs(interpreter, output_tensors)
     else
       error -> error
     end
@@ -619,8 +617,9 @@ defmodule TFLiteElixir.Interpreter do
     TFLiteTensor.set_data(tensor, Nx.to_binary(input))
   end
 
-  defp fetch_output(interpreter, output_tensors)
-       when is_list(output_tensors) do
+  # One name for both shapes left dialyzer unable to tell which a caller got
+  # back, so predict/2's spec had to promise a bare tensor it never returns.
+  defp fetch_outputs(interpreter, output_tensors) when is_list(output_tensors) do
     outputs = Enum.map(output_tensors, &fetch_output(interpreter, &1))
 
     # An output that could not be read is the whole call failing, not an item in

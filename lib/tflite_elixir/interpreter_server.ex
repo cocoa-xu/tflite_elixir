@@ -44,7 +44,7 @@ defmodule TFLiteElixir.Interpreter.Server do
   Feed, run and read back, as one operation.
   """
   @spec predict(pid(), binary() | list() | map(), timeout()) ::
-          [binary()] | {:error, String.t()}
+          [binary() | {:error, String.t()}] | {:error, String.t()}
   def predict(server, input, timeout \\ @default_timeout) do
     :tflite_beam_interpreter_server.predict(server, input, timeout)
   end

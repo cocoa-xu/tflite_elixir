@@ -35,6 +35,11 @@ defmodule TFLiteElixir.TFLiteTensor do
           | :resource
           | :variant
           | {:u, 32}
+          | {:u, 16}
+          | {:bf, 16}
+          | {:f, 8}
+          | {:f8_e4m3fn, 8}
+          | :unknown
 
   defstruct [
     :name,
@@ -111,7 +116,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   Given a struct this answers the snapshot; pass `tensor.reference` to ask the
   interpreter, which reports a retired handle rather than stale params.
   """
-  @spec quantization_params(%T{} | reference()) :: %TFLiteQuantizationParams{} | nif_error()
+  @spec quantization_params(%T{} | reference() | {:error, String.t()}) ::
+          %TFLiteQuantizationParams{} | nif_error()
   def quantization_params({:error, reason}), do: {:error, reason}
 
   def quantization_params(%T{quantization_params: quantization_params}),
@@ -134,7 +140,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   @doc """
   Set tensor data
   """
-  @spec set_data(%T{} | reference(), binary() | %Nx.Tensor{}) :: :ok | nif_error()
+  @spec set_data(%T{} | reference() | {:error, String.t()}, binary() | %Nx.Tensor{}) ::
+          :ok | nif_error()
   def set_data({:error, reason}, _data), do: {:error, reason}
 
   def set_data(%T{reference: reference}, data), do: set_data(reference, data)
@@ -150,7 +157,8 @@ defmodule TFLiteElixir.TFLiteTensor do
   @doc """
   Get binary data
   """
-  @spec to_binary(%T{} | reference(), non_neg_integer()) :: binary() | {:error, String.t()}
+  @spec to_binary(%T{} | reference() | {:error, String.t()}, non_neg_integer()) ::
+          binary() | {:error, String.t()}
   def to_binary(self, limit \\ 0)
 
   def to_binary({:error, reason}, _limit), do: {:error, reason}
@@ -215,7 +223,6 @@ defmodule TFLiteElixir.TFLiteTensor do
 
   defp nx_shape({:error, reason}), do: {:error, reason}
   defp nx_shape(dims) when is_list(dims), do: {:ok, List.to_tuple(dims)}
-  defp nx_shape(other), do: {:error, "cannot read this tensor's shape: #{inspect(other)}"}
 
   defp to_nx_backend(binary, type, backend) do
     case backend do

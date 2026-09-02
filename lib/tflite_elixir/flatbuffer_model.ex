@@ -28,7 +28,7 @@ defmodule TFLiteElixir.FlatBufferModel do
     Caller retains ownership of `error_reporter` and must ensure its lifetime
     is longer than the FlatBufferModel instance.
   """
-  @spec build_from_file(String.t()) :: %T{} | nif_error()
+  @spec build_from_file(String.t(), Keyword.t()) :: %T{} | nif_error()
   def build_from_file(filename, opts \\ []) when is_binary(filename) and is_list(opts) do
     error_reporter = ErrorReporter.from_struct(opts[:error_reporter])
 
@@ -50,11 +50,11 @@ defmodule TFLiteElixir.FlatBufferModel do
   @doc """
   Same as `build_from_file/2`, but raises rather than returning `{:error, reason}`.
   """
+  @spec build_from_file!(String.t(), Keyword.t()) :: %T{}
   def build_from_file!(filename, opts \\ []) do
-    case build_from_file(filename, opts) do
-      {:error, message} when is_list(message) -> raise List.to_string(message)
-      {:error, message} when is_binary(message) -> raise message
-      res -> res
+    case TFLiteElixir.Errorize.classify(build_from_file(filename, opts)) do
+      {:ok, res} -> res
+      {:raise, message} -> raise message
     end
   end
 
@@ -147,7 +147,7 @@ defmodule TFLiteElixir.FlatBufferModel do
   @doc """
   Check whether current model has been initialized
   """
-  @spec initialized(%T{}) :: bool() | nif_error()
+  @spec initialized(%T{}) :: boolean() | nif_error()
   def initialized(%T{model: self}) when is_reference(self) do
     :tflite_beam_flatbuffer_model.initialized(self)
   end
@@ -204,7 +204,7 @@ defmodule TFLiteElixir.FlatBufferModel do
   Get associated file(s) from a FlatBuffer model
   """
   @spec get_associated_file(binary(), [String.t()] | String.t()) ::
-          %{String.t() => String.t()} | String.t() | nif_error()
+          %{String.t() => String.t() | nif_error()} | String.t() | nif_error()
   def get_associated_file(buffer, filename)
       when is_binary(buffer) and (is_list(filename) or is_binary(filename)) do
     :tflite_beam_flatbuffer_model.get_associated_file(buffer, filename)
