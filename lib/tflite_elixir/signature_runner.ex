@@ -89,10 +89,12 @@ defmodule TFLiteElixir.SignatureRunner do
   Change the dimensions of the named input.
 
   `allocate_tensors/1` has to be called again afterwards.
+
+  `dims` is a list, or the tuple `TFLiteElixir.TFLiteTensor.shape/1` returns.
   """
-  @spec resize_input_tensor(reference(), String.t(), [integer()]) :: :ok | nif_error()
+  @spec resize_input_tensor(reference(), String.t(), [integer()] | tuple()) :: :ok | nif_error()
   def resize_input_tensor(self, input_name, dims)
-      when is_reference(self) and is_binary(input_name) and is_list(dims) do
+      when is_reference(self) and is_binary(input_name) and (is_list(dims) or is_tuple(dims)) do
     :tflite_beam_signature_runner.resize_input_tensor(self, input_name, dims)
   end
 
@@ -100,10 +102,13 @@ defmodule TFLiteElixir.SignatureRunner do
   Change the dimensions of the named input, keeping the rank fixed.
 
   Only dimensions the model left unknown can be changed.
+
+  `dims` is a list, or the tuple `TFLiteElixir.TFLiteTensor.shape/1` returns.
   """
-  @spec resize_input_tensor_strict(reference(), String.t(), [integer()]) :: :ok | nif_error()
+  @spec resize_input_tensor_strict(reference(), String.t(), [integer()] | tuple()) ::
+          :ok | nif_error()
   def resize_input_tensor_strict(self, input_name, dims)
-      when is_reference(self) and is_binary(input_name) and is_list(dims) do
+      when is_reference(self) and is_binary(input_name) and (is_list(dims) or is_tuple(dims)) do
     :tflite_beam_signature_runner.resize_input_tensor_strict(self, input_name, dims)
   end
 

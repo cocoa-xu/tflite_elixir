@@ -366,10 +366,12 @@ defmodule TFLiteElixir.Interpreter do
 
   Only inputs can be resized, and `allocate_tensors/1` has to be called again
   afterwards.
+
+  `dims` is a list, or the tuple `TFLiteElixir.TFLiteTensor.shape/1` returns.
   """
-  @spec resize_input_tensor(reference(), integer(), [integer()]) :: :ok | nif_error()
+  @spec resize_input_tensor(reference(), integer(), [integer()] | tuple()) :: :ok | nif_error()
   def resize_input_tensor(self, tensor_index, dims)
-      when is_reference(self) and is_integer(tensor_index) and is_list(dims) do
+      when is_reference(self) and is_integer(tensor_index) and (is_list(dims) or is_tuple(dims)) do
     :tflite_beam_interpreter.resize_input_tensor(self, tensor_index, dims)
   end
 
@@ -378,10 +380,13 @@ defmodule TFLiteElixir.Interpreter do
 
   Unlike `resize_input_tensor/3` this only accepts dimensions the model left unknown,
   so a tensor whose shape is fully fixed cannot be resized.
+
+  `dims` is a list, or the tuple `TFLiteElixir.TFLiteTensor.shape/1` returns.
   """
-  @spec resize_input_tensor_strict(reference(), integer(), [integer()]) :: :ok | nif_error()
+  @spec resize_input_tensor_strict(reference(), integer(), [integer()] | tuple()) ::
+          :ok | nif_error()
   def resize_input_tensor_strict(self, tensor_index, dims)
-      when is_reference(self) and is_integer(tensor_index) and is_list(dims) do
+      when is_reference(self) and is_integer(tensor_index) and (is_list(dims) or is_tuple(dims)) do
     :tflite_beam_interpreter.resize_input_tensor_strict(self, tensor_index, dims)
   end
 
