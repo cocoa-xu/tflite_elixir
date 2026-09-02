@@ -29,7 +29,7 @@ defmodule TFLiteElixir.MixProject do
   # that doing this by editing mix.exs invites committing the edit.
   defp tflite_beam_dep do
     case System.get_env("TFLITE_BEAM_PATH") do
-      nil -> {:tflite_beam, "1.0.0-rc4"}
+      nil -> {:tflite_beam, "1.0.0-rc5"}
       path -> {:tflite_beam, path: path, override: true}
     end
   end
