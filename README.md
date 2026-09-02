@@ -14,7 +14,7 @@ A general workflow looks like this,
 ```elixir
 # will download and install precompiled version
 Mix.install([
-  {:tflite_elixir, "~> 0.3"}
+  {:tflite_elixir, "~> 1.0"}
 ])
 
 # parrot.jpeg and the tflite file can be found in the test/test_data directory
@@ -383,19 +383,19 @@ Add `:tflite_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "~> 0.3"}
+    {:tflite_elixir, "1.0.0"}
   ]
 end
 ```
 
-The 1.0.0 release candidates build the runtime from
-[LiteRT](https://github.com/google-ai-edge/LiteRT) rather than from TensorFlow.
-Hex never resolves a pre-release from a range, so name it exactly:
+1.0.0 builds the runtime from [LiteRT](https://github.com/google-ai-edge/LiteRT)
+rather than from TensorFlow. The 0.3 line is the last one built from TensorFlow
+itself:
 
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "1.0.0-rc4"}
+    {:tflite_elixir, "~> 0.3"}
   ]
 end
 ```

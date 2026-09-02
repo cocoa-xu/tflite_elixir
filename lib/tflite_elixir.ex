@@ -94,7 +94,7 @@ defmodule TFLiteElixir do
   """
   @spec print_interpreter_state(reference()) :: nil | {:error, String.t()}
   def print_interpreter_state(interpreter) when is_reference(interpreter) do
-    :tflite_beam_nif.tflite_print_interpreter_state(interpreter)
+    :tflite_beam.print_interpreter_state(interpreter)
   end
 
   @doc """
@@ -108,6 +108,6 @@ defmodule TFLiteElixir do
   end
 
   def reset_variable_tensor(reference) when is_reference(reference) do
-    :tflite_beam_nif.tflite_reset_variable_tensor(reference)
+    :tflite_beam.reset_variable_tensor(reference)
   end
 end

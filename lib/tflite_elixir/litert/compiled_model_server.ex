@@ -35,7 +35,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   @default_timeout 30_000
 
   @doc "Start a compiled model process linked to the caller."
-  @spec start_link(reference(), String.t()) :: {:ok, pid()} | {:error, term()}
+  @spec start_link(reference(), String.t()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(env, model_path), do: @erl.start_link(env, model_path)
 
   @doc """
@@ -46,7 +46,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   - `:max_queue`. How many calls may be waiting before further ones are refused.
     Defaults to 64.
   """
-  @spec start_link(reference(), String.t(), opts()) :: {:ok, pid()} | {:error, term()}
+  @spec start_link(reference(), String.t(), opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(env, model_path, opts) when is_list(opts) do
     @erl.start_link(env, model_path, Map.new(opts))
   end
@@ -56,11 +56,11 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   end
 
   @doc "Start one outside a supervision tree."
-  @spec start(reference(), String.t()) :: {:ok, pid()} | {:error, term()}
+  @spec start(reference(), String.t()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(env, model_path), do: @erl.start(env, model_path)
 
   @doc "Start one outside a supervision tree, with options."
-  @spec start(reference(), String.t(), opts()) :: {:ok, pid()} | {:error, term()}
+  @spec start(reference(), String.t(), opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(env, model_path, opts) when is_list(opts),
     do: @erl.start(env, model_path, Map.new(opts))
 
