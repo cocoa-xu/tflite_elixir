@@ -18,6 +18,15 @@ defmodule TFLiteElixir.Coral do
   end
 
   @doc """
+  Where the bundled libedgetpu runtime is, if this build has one.
+
+  A build made with `TFLITE_BEAM_CORAL_SUPPORT=false` does not, and this then
+  says so rather than pointing at a file that is not there.
+  """
+  @spec default_libedgetpu_path() :: String.t() | {:error, String.t()}
+  def default_libedgetpu_path, do: :tflite_beam_coral.default_libedgetpu_path()
+
+  @doc """
   Returns a list of connected edge TPU devices.
   """
   @spec edge_tpu_devices() :: [String.t()] | {:error, String.t()}
