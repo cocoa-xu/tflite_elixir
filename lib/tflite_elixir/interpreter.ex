@@ -297,9 +297,10 @@ defmodule TFLiteElixir.Interpreter do
 
   ##### Returns:
 
-  Map containing serving names to SignatureDefs if exists, otherwise, `nil`.
+  `{:ok, map()}` of serving names to SignatureDefs, or `{:ok, nil}` for a model
+  that carries none.
   """
-  @spec get_signature_defs(reference()) :: {:ok, map()} | nil | {:error, String.t()}
+  @spec get_signature_defs(reference()) :: {:ok, map() | nil} | {:error, String.t()}
   def get_signature_defs(self) do
     :tflite_beam_interpreter.get_signature_defs(self)
   end
@@ -468,7 +469,7 @@ defmodule TFLiteElixir.Interpreter do
   call `Interpreter.invoke` and return output tensor(s)
   """
   @spec predict(reference(), binary() | [binary()] | map()) ::
-          binary() | [binary()] | map() | nif_error()
+          Nx.Tensor.t() | [Nx.Tensor.t()] | nif_error()
   def predict(interpreter, input) do
     with {:ok, input_tensors} <- Interpreter.inputs(interpreter),
          {:ok, output_tensors} <- Interpreter.outputs(interpreter),

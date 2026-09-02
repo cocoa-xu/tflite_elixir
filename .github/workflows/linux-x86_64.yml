@@ -57,3 +57,17 @@ jobs:
           # because nothing compared it to the one being released
           python3 scripts/check_readme_version.py
           mix test
+
+      - name: Cache the dialyzer PLT
+        uses: actions/cache@v4
+        with:
+          path: _build/dev/*.plt*
+          key: plt-${{ runner.os }}-otp26-elixir1.16-${{ hashFiles('mix.lock') }}
+          restore-keys: plt-${{ runner.os }}-otp26-elixir1.16-
+
+      - name: Dialyzer
+        run: |
+          # five @spec here denied behaviour the code has and the docs explain,
+          # because nothing was checking them: tflite_beam has run dialyzer since
+          # its own eight had piled up, and this side never did
+          mix dialyzer --format short

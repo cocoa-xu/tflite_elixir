@@ -9,6 +9,7 @@ defmodule TFLiteElixir.MixProject do
     [
       app: @app,
       version: @version,
+      dialyzer: dialyzer(),
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -39,7 +40,23 @@ defmodule TFLiteElixir.MixProject do
       tflite_beam_dep(),
       {:nx, "~> 0.11"},
       {:stb_image, "~> 0.6"},
-      {:ex_doc, "~> 0.27", only: :docs, runtime: false}
+      {:ex_doc, "~> 0.27", only: :docs, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  # The deferror/1 macro writes the same three-way case for every raising
+  # variant, so the branch for a charlist reason is dead wherever the wrapped
+  # function only ever returns a binary one. That is a property of the macro, not
+  # of the function it wrapped, and 58 of them buried everything else.
+  # extra_return and missing_return are the pair that does catch something here:
+  # a @spec that is narrower than what the function can actually return.
+  defp dialyzer do
+    [
+      flags: [:extra_return, :missing_return, :error_handling, :unknown],
+      plt_add_apps: [:mix],
+      ignore_warnings: ".dialyzer_ignore.exs",
+      list_unused_filters: true
     ]
   end
 
