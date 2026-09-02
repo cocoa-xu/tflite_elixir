@@ -104,6 +104,10 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
       {:ok, fully} -> fully
       _ -> false
     end
+  catch
+    # a server that is gone, or one that did not answer in time, is an exit
+    # from gen_server:call, and the promise here is a boolean
+    :exit, _ -> false
   end
 
   deferror(fully_accelerated(server))

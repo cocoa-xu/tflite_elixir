@@ -88,12 +88,13 @@ defmodule TFLiteElixir do
   @doc """
   Prints a dump of what tensors and what nodes are in the interpreter.
 
-  Note that this function directly prints to stdout
+  Note that this function directly prints to stdout. It answers `nil` once it
+  has, or `{:error, reason}` when another process is using the interpreter or
+  it belongs to one, which used to be swallowed and reported as `nil`.
   """
-  @spec print_interpreter_state(reference()) :: nil
-  def print_interpreter_state(interpreter) do
+  @spec print_interpreter_state(reference()) :: nil | {:error, String.t()}
+  def print_interpreter_state(interpreter) when is_reference(interpreter) do
     :tflite_beam_nif.tflite_print_interpreter_state(interpreter)
-    nil
   end
 
   @doc """
