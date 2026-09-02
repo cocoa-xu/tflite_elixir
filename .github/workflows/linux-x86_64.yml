@@ -53,4 +53,7 @@ jobs:
           mix deps.get
           # a formatting drift nobody is watching becomes a diff nobody can read
           mix format --check-formatted
+          # tflite_beam's install snippet named a version three releases old
+          # because nothing compared it to the one being released
+          python3 scripts/check_readme_version.py
           mix test
