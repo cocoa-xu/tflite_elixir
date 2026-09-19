@@ -2,7 +2,7 @@ defmodule TFLiteElixir.MixProject do
   use Mix.Project
 
   @app :tflite_elixir
-  @version "1.0.0"
+  @version "1.0.1"
   @github_url "https://github.com/cocoa-xu/tflite_elixir"
 
   def project do
@@ -38,9 +38,9 @@ defmodule TFLiteElixir.MixProject do
   defp deps do
     [
       tflite_beam_dep(),
-      {:nx, "~> 0.11"},
-      {:stb_image, "~> 0.6"},
-      {:ex_doc, "~> 0.27", only: :docs, runtime: false},
+      {:nx, "~> 0.11 or ~> 1.0"},
+      {:stb_image, "~> 0.6 or ~> 1.0"},
+      {:ex_doc, "~> 0.31", only: :docs, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
