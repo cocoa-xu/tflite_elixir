@@ -26,10 +26,13 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.LiteRT.CompiledModel
+  alias TFLiteElixir.LiteRT.Compatibility
 
-  @type opts :: [
-          {:max_queue, non_neg_integer()} | {atom(), term()}
-        ]
+  @type opts ::
+          [
+            {:max_queue, non_neg_integer()} | {atom(), term()}
+          ]
+          | map()
 
   @erl :tflite_beam_litert_compiled_model_server
   @default_timeout 30_000
@@ -48,11 +51,11 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   """
   @spec start_link(reference(), String.t(), opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(env, model_path, opts) when is_list(opts) do
-    @erl.start_link(env, model_path, Map.new(opts))
+    start_link(env, model_path, Map.new(opts))
   end
 
   def start_link(env, model_path, opts) when is_map(opts) do
-    @erl.start_link(env, model_path, opts)
+    Compatibility.with_backend_options(opts, &@erl.start_link(env, model_path, &1))
   end
 
   @doc "Start one outside a supervision tree."
@@ -62,9 +65,10 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   @doc "Start one outside a supervision tree, with options."
   @spec start(reference(), String.t(), opts()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start(env, model_path, opts) when is_list(opts),
-    do: @erl.start(env, model_path, Map.new(opts))
+    do: start(env, model_path, Map.new(opts))
 
-  def start(env, model_path, opts) when is_map(opts), do: @erl.start(env, model_path, opts)
+  def start(env, model_path, opts) when is_map(opts),
+    do: Compatibility.with_backend_options(opts, &@erl.start(env, model_path, &1))
 
   @doc "Run the model over a list of input binaries."
   @spec run(pid(), [binary()]) :: {:ok, [binary()]} | {:error, String.t()}
@@ -80,10 +84,11 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
   @doc """
   Run a function against the compiled model inside the owning process.
 
-  The escape hatch for anything this module does not forward. The reference is
-  only usable for the duration of the call, because the server owns the model
-  and takes it back afterwards. A function that raises costs the call and not
-  the model.
+  The callback runs in the server process and must return promptly. A function
+  that raises costs the call, not the model. A timeout ends the caller's wait;
+  it does not cancel the callback. The callback can transfer ownership with
+  `CompiledModel.controlling_process/2`, leaving the server unable to use its
+  model, so `with/2` is not an ownership sandbox.
   """
   @spec with(pid(), (reference() -> result)) :: result | {:error, String.t()} when result: term()
   def with(server, fun), do: @erl.with(server, fun)
@@ -93,7 +98,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
         when result: term()
   def with(server, fun, timeout), do: @erl.with(server, fun, timeout)
 
-  @doc "Whether the accelerator took the whole graph."
+  @doc "Whether every operation was delegated, including to CPU delegates such as XNNPACK."
   @spec fully_accelerated(pid()) :: {:ok, boolean()} | {:error, String.t()}
   def fully_accelerated(server), do: @erl.fully_accelerated(server)
 
@@ -112,6 +117,25 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
 
   deferror(fully_accelerated(server))
 
+  @doc "Whether every operation executes on GPU or NPU, with no CPU execution."
+  @spec non_cpu_fully_accelerated(pid()) :: {:ok, boolean()} | {:error, String.t()}
+  def non_cpu_fully_accelerated(server) do
+    Compatibility.call(@erl, :non_cpu_fully_accelerated, [server])
+  end
+
+  @doc "As `non_cpu_fully_accelerated/1`, returning false if the query fails."
+  @spec non_cpu_fully_accelerated?(pid()) :: boolean()
+  def non_cpu_fully_accelerated?(server) do
+    case non_cpu_fully_accelerated(server) do
+      {:ok, fully} -> fully
+      _ -> false
+    end
+  catch
+    :exit, _ -> false
+  end
+
+  deferror(non_cpu_fully_accelerated(server))
+
   @doc "The byte size of each input and output tensor, as `{inputs, outputs}`."
   @spec io_sizes(pid()) ::
           {:ok, {[non_neg_integer()], [non_neg_integer()]}} | {:error, String.t()}
@@ -124,18 +148,27 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Server do
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(server, inputs), do: @erl.run_with_metrics(server, inputs)
 
-  @doc "As `run_with_metrics/2`, at a given detail level."
-  @spec run_with_metrics(pid(), [binary()], non_neg_integer()) ::
+  @doc "As `CompiledModel.run_with_metrics/3`, with an integer detail level or metrics options."
+  @spec run_with_metrics(
+          pid(),
+          [binary()],
+          CompiledModel.detail_level() | CompiledModel.metrics_options()
+        ) ::
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(server, inputs, detail_level) do
-    @erl.run_with_metrics(server, inputs, detail_level)
+    Compatibility.metrics(@erl, [server, inputs, detail_level])
   end
 
   @doc "As `run_with_metrics/3`, waiting at most `timeout`."
-  @spec run_with_metrics(pid(), [binary()], non_neg_integer(), timeout()) ::
+  @spec run_with_metrics(
+          pid(),
+          [binary()],
+          CompiledModel.detail_level() | CompiledModel.metrics_options(),
+          timeout()
+        ) ::
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(server, inputs, detail_level, timeout) do
-    @erl.run_with_metrics(server, inputs, detail_level, timeout)
+    Compatibility.metrics(@erl, [server, inputs, detail_level, timeout])
   end
 
   deferror(run_with_metrics(server, inputs))

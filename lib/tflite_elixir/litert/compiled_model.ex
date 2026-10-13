@@ -13,9 +13,8 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
       {:ok, outputs} = TFLiteElixir.LiteRT.CompiledModel.run(model, inputs)
       {:ok, slowest} = TFLiteElixir.LiteRT.CompiledModel.summarise_profile(model)
 
-  `fully_accelerated?/1` says whether the accelerator took the whole graph or
-  only part of it, which is the difference between a speedup and a slowdown and
-  is not otherwise visible.
+  `fully_accelerated?/1` includes CPU delegates such as XNNPACK. Use
+  `non_cpu_fully_accelerated?/1` to ask whether GPU or NPU executes every operation.
 
   ## One caller at a time
 
@@ -35,22 +34,27 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
 
   import TFLiteElixir.Errorize, only: [deferror: 1]
 
-  @typedoc "What to run on, in order of preference."
+  alias TFLiteElixir.LiteRT.Compatibility
+
+  @typedoc "The accelerators allowed to execute the model; list order does not set priority."
   @type accelerator :: :cpu | :gpu | :npu
 
   @typedoc """
-  Compute precision. `:default` leaves it to the accelerator, which for Metal
-  means fp32; `:fp16` trades accuracy for speed.
+  Compute precision. `:default` leaves it to the accelerator; request `:fp32`
+  explicitly when accuracy matters. `:fp16` trades accuracy for speed.
   """
   @type precision :: :default | :fp16 | :fp32 | :fp16_with_fp32_accum
 
-  @type opts :: [
-          accelerators: [accelerator()],
-          precision: precision(),
-          profile: boolean(),
-          signature: non_neg_integer() | String.t(),
-          max_model_bytes: non_neg_integer()
-        ]
+  @type opts ::
+          [
+            accelerators: [accelerator()],
+            precision: precision(),
+            profile: boolean(),
+            signature: non_neg_integer() | String.t(),
+            max_model_bytes: non_neg_integer(),
+            backend_options: backend_options()
+          ]
+          | map()
 
   @typedoc "A profiling event. An integer type or source is one this build has no name for."
   @type event :: %{
@@ -69,12 +73,26 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
 
   @type metric_value :: integer() | float() | boolean() | binary() | :unsupported
 
+  @type backend_options :: %{
+          optional(:cpu | :gpu | :arm | :intel_openvino | :google_tensor | :mediatek | :qualcomm) =>
+            map()
+        }
+  @type detail_level :: 0..2_147_483_647
+
+  @type metrics_options ::
+          %{
+            optional(:detail_level) => detail_level(),
+            optional(:host_timing) => boolean(),
+            optional(:extra_metrics) => [{binary(), integer() | float() | boolean() | binary()}]
+          }
+          | Keyword.t()
+
   @erl :tflite_beam_litert_compiled_model
 
   @doc """
   A LiteRT environment, which the accelerator plugins are loaded into.
 
-  One is enough for any number of models and it has to outlive them.
+  One can serve any number of models. Each compiled model retains its environment.
   """
   @spec environment() :: {:ok, reference()} | {:error, String.t()}
   def environment, do: @erl.environment()
@@ -111,22 +129,26 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   Compile a model.
 
   ##### Options
-  - `:accelerators`. What to run on, in order of preference, e.g. `[:cpu, :gpu]`.
-    Naming an accelerator asks for it; whether it was used is
-    `fully_accelerated?/1`. Defaults to `[:cpu]`.
+  - `:accelerators`. Which accelerators may run the model, e.g. `[:cpu, :gpu]`.
+    List order does not set priority.
+    `non_cpu_fully_accelerated?/1` reports whether GPU or NPU executes the
+    whole graph. Defaults to `[:cpu]`.
   - `:precision`. `:default`, `:fp16`, `:fp32` or `:fp16_with_fp32_accum`.
   - `:profile`. Record per-operator timings, readable with `profile/1` and
     `summarise_profile/1`. Off by default because it is not free.
   - `:signature`. Which signature to compile for, by index or by name.
   - `:max_model_bytes`. Refuse a model file larger than this.
+  - `:backend_options`. A map of backend names to typed settings. Requires an
+    upstream version with `backend_options/1`; older versions return an error
+    rather than ignoring the requested settings.
   """
   @spec new(reference(), String.t(), opts()) :: {:ok, reference()} | {:error, String.t()}
   def new(env, model_path, opts) when is_list(opts) do
-    @erl.new(env, model_path, Map.new(opts))
+    new(env, model_path, Map.new(opts))
   end
 
   def new(env, model_path, opts) when is_map(opts) do
-    @erl.new(env, model_path, opts)
+    Compatibility.with_backend_options(opts, &@erl.new(env, model_path, &1))
   end
 
   deferror(new(env, model_path))
@@ -151,11 +173,9 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   deferror(io_sizes(model))
 
   @doc """
-  Whether the accelerator took the whole graph.
-
-  A partly accelerated model pays for every crossing between the accelerator and
-  the CPU, and is often slower than the CPU alone, so a `false` here is worth
-  acting on rather than ignoring.
+  Whether every operation was delegated, including to CPU delegates such as
+  XNNPACK. Use `non_cpu_fully_accelerated/1` to distinguish GPU or NPU execution
+  from CPU execution.
   """
   @spec fully_accelerated?(reference()) :: boolean()
   def fully_accelerated?(model) do
@@ -170,6 +190,35 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   def fully_accelerated(model), do: @erl.fully_accelerated(model)
 
   deferror(fully_accelerated(model))
+
+  @doc "Whether every operation executes on GPU or NPU, with no CPU execution."
+  @spec non_cpu_fully_accelerated(reference()) :: {:ok, boolean()} | {:error, String.t()}
+  def non_cpu_fully_accelerated(model) do
+    Compatibility.call(@erl, :non_cpu_fully_accelerated, [model])
+  end
+
+  @doc "As `non_cpu_fully_accelerated/1`, returning false if the query fails."
+  @spec non_cpu_fully_accelerated?(reference()) :: boolean()
+  def non_cpu_fully_accelerated?(model) do
+    case non_cpu_fully_accelerated(model) do
+      {:ok, fully} -> fully
+      _ -> false
+    end
+  end
+
+  deferror(non_cpu_fully_accelerated(model))
+
+  @doc """
+  Validate typed backend settings and return their `{identifier, TOML}` payloads.
+
+  Takes a map such as `%{cpu: %{num_threads: 4}}`. Validation does not require
+  vendor hardware. A setting takes effect only when the loaded backend supports
+  it. This requires a newer upstream API; older dependencies return an error.
+  """
+  @spec backend_options(backend_options()) :: {:ok, [{binary(), binary()}]} | {:error, String.t()}
+  def backend_options(options), do: Compatibility.call(@erl, :backend_options, [options])
+
+  deferror(backend_options(options))
 
   @doc "Every profiling event recorded so far, oldest first."
   @spec profile(reference()) :: {:ok, [event()]} | {:error, String.t()}
@@ -227,16 +276,27 @@ defmodule TFLiteElixir.LiteRT.CompiledModel do
   @doc """
   Run with metrics collection bracketing the inference.
 
+  The third argument accepts the existing integer detail level or a keyword
+  list/map with `:detail_level`, `:host_timing` and `:extra_metrics`.
+  `host_timing: true` adds `"tflite_beam_run_us"`, measured across input transfer,
+  synchronous inference and output transfer, excluding queue waiting and metrics
+  collection. `extra_metrics` contains `{binary_name, value}` tuples; values may
+  be signed 64-bit integers, floats, booleans or binaries without NUL bytes.
+  These are caller-provided measurements, not callbacks into native code.
+
+  Metrics options require a newer upstream API; older dependencies return an
+  error. Integer detail levels retain their existing behavior.
+
   Usually the counters come back empty. Filling them in is the accelerator's
   job, through two entries of its definition that are allowed to be null, so an
   empty list means nobody offered anything rather than that something went
   wrong. Use `profile/1` for timings; this is for counters a backend chooses to
   expose.
   """
-  @spec run_with_metrics(reference(), [binary()], non_neg_integer()) ::
+  @spec run_with_metrics(reference(), [binary()], detail_level() | metrics_options()) ::
           {:ok, {[binary()], [{binary(), metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(model, inputs, detail_level) do
-    @erl.run_with_metrics(model, inputs, detail_level)
+    Compatibility.metrics(@erl, [model, inputs, detail_level])
   end
 
   deferror(run_with_metrics(model, inputs))
