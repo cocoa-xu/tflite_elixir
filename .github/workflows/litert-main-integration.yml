@@ -87,4 +87,6 @@ jobs:
           '
 
       - name: Test upstream integration
-        run: mix test
+        run: |
+          epmd -daemon
+          mix test
