@@ -31,7 +31,7 @@ jobs:
       # never ran. It selects the precompiled variant that carries the API.
       TFLITE_BEAM_ENABLE_LITERT_API: "true"
       OTP_VERSION: "26.2.1"
-      ELIXIR_VERSION: "1.16.0"
+      ELIXIR_VERSION: "1.17.3"
 
     steps:
       - name: Checkout

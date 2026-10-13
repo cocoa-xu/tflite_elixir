@@ -1,0 +1,90 @@
+name: LiteRT upstream integration
+
+on:
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'mix.exs'
+      - 'mix.lock'
+      - '.github/workflows/litert-main-integration.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'mix.exs'
+      - 'mix.lock'
+      - '.github/workflows/litert-main-integration.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upstream_main:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MIX_ENV: test
+      TFLITE_BEAM_PATH: ${{ github.workspace }}/upstream/tflite_beam
+      TFLITE_BEAM_CORAL_SUPPORT: "true"
+      TFLITE_BEAM_PREFER_PRECOMPILED: "false"
+      TFLITE_BEAM_ENABLE_LITERT_API: "true"
+
+    steps:
+      - name: Checkout Elixir binding
+        uses: actions/checkout@v7
+
+      - name: Checkout upstream main
+        uses: actions/checkout@v7
+        with:
+          repository: cocoa-xu/tflite_beam
+          ref: main
+          path: upstream/tflite_beam
+
+      - name: Install OTP and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "26"
+          elixir-version: "1.17"
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential automake autoconf pkg-config bc m4 unzip zip curl git cmake python3 libssl-dev libncurses5-dev libtinfo5 ca-certificates
+
+      - name: Compile source dependency and Elixir binding
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+          mix compile --warnings-as-errors
+
+      - name: Require the new LiteRT API
+        run: |
+          mix run -e '
+            alias TFLiteElixir.LiteRT.CompiledModel
+            alias TFLiteElixir.LiteRT.Compatibility
+            unless CompiledModel.available?(), do: raise("LiteRT API was not compiled")
+            for {module, function, arity} <- [
+              {:tflite_beam_litert_compiled_model, :non_cpu_fully_accelerated, 1},
+              {:tflite_beam_litert_compiled_model, :backend_options, 1},
+              {:tflite_beam_litert_compiled_model_server, :non_cpu_fully_accelerated, 1},
+              {:tflite_beam_litert_compiled_model_isolated, :non_cpu_fully_accelerated, 1},
+              {:tflite_beam_nif, :litert_compiled_model_run_with_metrics, 5},
+              {:tflite_beam_litert_model, :inspect, 2},
+              {:tflite_beam_litert_model, :rewrite, 3}
+            ] do
+              unless Compatibility.supported?(module, function, arity),
+                do: raise("missing upstream API: #{module}.#{function}/#{arity}")
+            end
+          '
+
+      - name: Test upstream integration
+        run: mix test
