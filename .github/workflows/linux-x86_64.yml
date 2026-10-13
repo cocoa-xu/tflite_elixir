@@ -41,7 +41,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26"
-          elixir-version: "1.16"
+          elixir-version: "1.17"
 
       - name: Install system dependecies
         run: |
@@ -65,8 +65,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: _build/dev/*.plt*
-          key: plt-${{ runner.os }}-otp26-elixir1.16-${{ hashFiles('mix.lock') }}
-          restore-keys: plt-${{ runner.os }}-otp26-elixir1.16-
+          key: plt-${{ runner.os }}-otp26-elixir1.17-${{ hashFiles('mix.lock') }}
+          restore-keys: plt-${{ runner.os }}-otp26-elixir1.17-
 
       - name: Dialyzer
         run: |
