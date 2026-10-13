@@ -30,18 +30,22 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   import TFLiteElixir.Errorize, only: [deferror: 1]
 
   alias TFLiteElixir.LiteRT.CompiledModel
+  alias TFLiteElixir.LiteRT.Compatibility
 
-  @type opts :: [
-          {:model_path, String.t()}
-          | {:runtime_library_dir, String.t()}
-          | {:accelerators, [CompiledModel.accelerator()]}
-          | {:precision, CompiledModel.precision()}
-          | {:profile, boolean()}
-          | {:signature, non_neg_integer() | String.t()}
-          | {:max_model_bytes, non_neg_integer()}
-          | {:max_queue, non_neg_integer()}
-          | {:peer_args, [String.t()]}
-        ]
+  @type opts ::
+          [
+            {:model_path, String.t()}
+            | {:runtime_library_dir, String.t()}
+            | {:accelerators, [CompiledModel.accelerator()]}
+            | {:precision, CompiledModel.precision()}
+            | {:profile, boolean()}
+            | {:signature, non_neg_integer() | String.t()}
+            | {:max_model_bytes, non_neg_integer()}
+            | {:backend_options, CompiledModel.backend_options()}
+            | {:max_queue, non_neg_integer()}
+            | {:peer_args, [String.t()]}
+          ]
+          | map()
 
   @erl :tflite_beam_litert_compiled_model_isolated
 
@@ -55,26 +59,33 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   - `:peer_args`. Extra arguments for the node itself, e.g. `["+sbwt", "none"]`.
   """
   @spec start_link(opts()) :: {:ok, pid()} | :ignore | {:error, term()}
-  def start_link(opts) when is_list(opts), do: @erl.start_link(Map.new(opts))
-  def start_link(opts) when is_map(opts), do: @erl.start_link(opts)
+  def start_link(opts) when is_list(opts), do: start_link(Map.new(opts))
+
+  def start_link(opts) when is_map(opts),
+    do: Compatibility.with_backend_options(opts, &@erl.start_link/1)
 
   @doc "As `start_link/1`, with options for the gen_server itself."
   @spec start_link(opts(), list()) :: {:ok, pid()} | :ignore | {:error, term()}
   def start_link(opts, gen_opts) when is_list(opts) do
-    @erl.start_link(Map.new(opts), gen_opts)
+    start_link(Map.new(opts), gen_opts)
   end
 
-  def start_link(opts, gen_opts) when is_map(opts), do: @erl.start_link(opts, gen_opts)
+  def start_link(opts, gen_opts) when is_map(opts),
+    do: Compatibility.with_backend_options(opts, &@erl.start_link(&1, gen_opts))
 
   @doc "Start one outside a supervision tree."
   @spec start(opts()) :: {:ok, pid()} | :ignore | {:error, term()}
-  def start(opts) when is_list(opts), do: @erl.start(Map.new(opts))
-  def start(opts) when is_map(opts), do: @erl.start(opts)
+  def start(opts) when is_list(opts), do: start(Map.new(opts))
+
+  def start(opts) when is_map(opts),
+    do: Compatibility.with_backend_options(opts, &@erl.start/1)
 
   @doc "As `start/1`, with options for the gen_server itself."
   @spec start(opts(), list()) :: {:ok, pid()} | :ignore | {:error, term()}
-  def start(opts, gen_opts) when is_list(opts), do: @erl.start(Map.new(opts), gen_opts)
-  def start(opts, gen_opts) when is_map(opts), do: @erl.start(opts, gen_opts)
+  def start(opts, gen_opts) when is_list(opts), do: start(Map.new(opts), gen_opts)
+
+  def start(opts, gen_opts) when is_map(opts),
+    do: Compatibility.with_backend_options(opts, &@erl.start(&1, gen_opts))
 
   @doc "Run the model over a list of input binaries."
   @spec run(pid(), [binary()]) :: {:ok, [binary()]} | {:error, String.t()}
@@ -100,18 +111,27 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(model, inputs), do: @erl.run_with_metrics(model, inputs)
 
-  @doc "As `run_with_metrics/2`, at a given detail level."
-  @spec run_with_metrics(pid(), [binary()], non_neg_integer()) ::
+  @doc "As `CompiledModel.run_with_metrics/3`, with an integer detail level or metrics options."
+  @spec run_with_metrics(
+          pid(),
+          [binary()],
+          CompiledModel.detail_level() | CompiledModel.metrics_options()
+        ) ::
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(model, inputs, detail_level) do
-    @erl.run_with_metrics(model, inputs, detail_level)
+    Compatibility.metrics(@erl, [model, inputs, detail_level])
   end
 
   @doc "As `run_with_metrics/3`, waiting at most `timeout`."
-  @spec run_with_metrics(pid(), [binary()], non_neg_integer(), timeout()) ::
+  @spec run_with_metrics(
+          pid(),
+          [binary()],
+          CompiledModel.detail_level() | CompiledModel.metrics_options(),
+          timeout()
+        ) ::
           {:ok, {[binary()], [{binary(), CompiledModel.metric_value()}]}} | {:error, String.t()}
   def run_with_metrics(model, inputs, detail_level, timeout) do
-    @erl.run_with_metrics(model, inputs, detail_level, timeout)
+    Compatibility.metrics(@erl, [model, inputs, detail_level, timeout])
   end
 
   deferror(run_with_metrics(model, inputs))
@@ -132,7 +152,7 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
 
   deferror(io_sizes(model))
 
-  @doc "Whether the accelerator took the whole graph."
+  @doc "Whether every operation was delegated, including to CPU delegates such as XNNPACK."
   @spec fully_accelerated(pid()) :: {:ok, boolean()} | {:error, String.t()}
   def fully_accelerated(model), do: @erl.fully_accelerated(model)
 
@@ -146,6 +166,23 @@ defmodule TFLiteElixir.LiteRT.CompiledModel.Isolated do
   end
 
   deferror(fully_accelerated(model))
+
+  @doc "Whether every operation executes on GPU or NPU, with no CPU execution."
+  @spec non_cpu_fully_accelerated(pid()) :: {:ok, boolean()} | {:error, String.t()}
+  def non_cpu_fully_accelerated(model) do
+    Compatibility.call(@erl, :non_cpu_fully_accelerated, [model])
+  end
+
+  @doc "As `non_cpu_fully_accelerated/1`, returning false if the query fails."
+  @spec non_cpu_fully_accelerated?(pid()) :: boolean()
+  def non_cpu_fully_accelerated?(model) do
+    case non_cpu_fully_accelerated(model) do
+      {:ok, fully} -> fully
+      _ -> false
+    end
+  end
+
+  deferror(non_cpu_fully_accelerated(model))
 
   @doc "Every profiling event recorded so far."
   @spec profile(pid()) :: {:ok, [CompiledModel.event()]} | {:error, String.t()}

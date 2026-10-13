@@ -415,6 +415,48 @@ bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
 raises `ArgumentError` on either of those tensors, so the floor states what the
 binding can actually hand over rather than leaving it to be discovered.
 
+## LiteRT compiled-model options with an upstream checkout
+
+The new acceleration query, metrics options, backend settings and experimental
+`TFLiteElixir.LiteRT.Model` graph API require the corresponding APIs in
+`tflite_beam` main. The pinned Hex dependency `tflite_beam 1.0.0` does not include
+them; requests for unsupported features return an error. Existing integer
+metrics detail levels keep their behavior.
+
+To develop against a sibling upstream checkout with the LiteRT API enabled:
+
+```sh
+export TFLITE_BEAM_PATH="../tflite_beam"
+export TFLITE_BEAM_ENABLE_LITERT_API=true
+export TFLITE_BEAM_PREFER_PRECOMPILED=false
+mix deps.get
+mix test
+```
+
+For a model with one input tensor:
+
+```elixir
+alias TFLiteElixir.LiteRT.CompiledModel
+
+env = CompiledModel.environment!()
+model = CompiledModel.new!(env, "model.tflite",
+  backend_options: %{cpu: %{num_threads: 4}})
+
+inputs = [File.read!("input.bin")]
+{outputs, metrics} = CompiledModel.run_with_metrics!(model, inputs,
+  host_timing: true, extra_metrics: [{"batch_size", 1}])
+
+CompiledModel.non_cpu_fully_accelerated?(model)
+```
+
+`host_timing` adds `"tflite_beam_run_us"` across input transfer, synchronous
+inference and output transfer, excluding queue waiting and metrics collection.
+Extra metrics are caller-provided values. `non_cpu_fully_accelerated?/1` requires
+all operations to run on GPU or NPU; `fully_accelerated?/1` also includes CPU
+delegates such as XNNPACK. The server and isolated wrappers accept the same
+metrics options and backend settings. Vendor settings take effect only when the
+loaded backend supports them.
+
 ## What the numbers actually say
 
 Measured on an Apple M4 Max, macOS 15.7.3, with

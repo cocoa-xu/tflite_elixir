@@ -10,12 +10,21 @@ litert_exclusions =
 xnnpack_exclusions =
   if :xnnpack in :tflite_beam_delegate.available(), do: [], else: [require_xnnpack: true]
 
+litert_23_exclusions =
+  if TFLiteElixir.LiteRT.Compatibility.supported?(
+       :tflite_beam_litert_compiled_model,
+       :non_cpu_fully_accelerated,
+       1
+     ),
+     do: [],
+     else: [litert_23: true]
+
 ExUnit.configure(
   exclude:
     [
       # exclude all tests that require a physical TPU by default
       require_tpu: true
-    ] ++ litert_exclusions ++ xnnpack_exclusions
+    ] ++ litert_exclusions ++ litert_23_exclusions ++ xnnpack_exclusions
 )
 
 ExUnit.start()
