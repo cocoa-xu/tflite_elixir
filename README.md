@@ -383,14 +383,14 @@ Add `:tflite_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "1.0.0"}
+    {:tflite_elixir, "1.1.0"}
   ]
 end
 ```
 
-1.0.0 builds the runtime from [LiteRT](https://github.com/google-ai-edge/LiteRT)
-rather than from TensorFlow. The 0.3 line is the last one built from TensorFlow
-itself:
+Since 1.0.0, the binding builds the runtime from
+[LiteRT](https://github.com/google-ai-edge/LiteRT) rather than from TensorFlow.
+The 0.3 line is the last one built from TensorFlow itself:
 
 ```elixir
 def deps do
@@ -409,19 +409,28 @@ TensorFlow's; the two version lines are not comparable, so LiteRT's 2.2.0 is
 newer than TensorFlow's 2.21.0 rather than older. That number is what a delegate
 plugin has to match.
 
-This release requires `nx ~> 0.11`, up from `~> 0.5`. LiteRT reports two eight
-bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
+The binding requires `nx ~> 0.11 or ~> 1.0`, up from `~> 0.5`. LiteRT reports two
+eight bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
 `{:f8_e4m3fn, 8}` for E4M3FN in 0.11.0. On an older Nx, `TFLiteTensor.to_nx/2`
 raises `ArgumentError` on either of those tensors, so the floor states what the
 binding can actually hand over rather than leaving it to be discovered.
 
-## LiteRT compiled-model options with an upstream checkout
+## LiteRT 2.3 compiled-model options
 
 The new acceleration query, metrics options, backend settings and experimental
-`TFLiteElixir.LiteRT.Model` graph API require the corresponding APIs in
-`tflite_beam` main. The pinned Hex dependency `tflite_beam 1.0.0` does not include
-them; requests for unsupported features return an error. Existing integer
+`TFLiteElixir.LiteRT.Model` graph API require `tflite_beam 1.1.0` with the LiteRT
+API enabled. The dependency requirement `~> 1.0` also supports `tflite_beam 1.0.0`,
+where requests for these unsupported features return an error. Existing integer
 metrics detail levels keep their behavior.
+
+If your lock file still selects `tflite_beam 1.0.0`, update it and enable the
+LiteRT API before compiling:
+
+```sh
+export TFLITE_BEAM_ENABLE_LITERT_API=true
+mix deps.update tflite_beam
+mix deps.compile tflite_beam --force
+```
 
 To develop against a sibling upstream checkout with the LiteRT API enabled:
 
