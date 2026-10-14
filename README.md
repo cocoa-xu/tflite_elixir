@@ -383,7 +383,7 @@ Add `:tflite_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tflite_elixir, "1.1.0"}
+    {:tflite_elixir, "1.1.1"}
   ]
 end
 ```
@@ -409,11 +409,12 @@ TensorFlow's; the two version lines are not comparable, so LiteRT's 2.2.0 is
 newer than TensorFlow's 2.21.0 rather than older. That number is what a delegate
 plugin has to match.
 
-The binding requires `nx ~> 0.11 or ~> 1.0`, up from `~> 0.5`. LiteRT reports two
-eight bit float formats, and Nx gained `{:f, 8}` for E5M2 in 0.9.0 and
-`{:f8_e4m3fn, 8}` for E4M3FN in 0.11.0. On an older Nx, `TFLiteTensor.to_nx/2`
-raises `ArgumentError` on either of those tensors, so the floor states what the
-binding can actually hand over rather than leaving it to be discovered.
+The binding requires Elixir 1.17 or later and `nx ~> 0.11 or ~> 1.0`, up from
+`~> 0.5`. LiteRT reports two eight bit float formats, and Nx gained `{:f, 8}`
+for E5M2 in 0.9.0 and `{:f8_e4m3fn, 8}` for E4M3FN in 0.11.0. On an older Nx,
+`TFLiteTensor.to_nx/2` raises `ArgumentError` on either of those tensors, so the
+floor states what the binding can actually hand over rather than leaving it to
+be discovered.
 
 ## LiteRT 2.3 compiled-model options
 
@@ -422,6 +423,9 @@ The new acceleration query, metrics options, backend settings and experimental
 API enabled. The dependency requirement `~> 1.0` also supports `tflite_beam 1.0.0`,
 where requests for these unsupported features return an error. Existing integer
 metrics detail levels keep their behavior.
+
+Use `tflite_beam 1.1.1` or later for isolated model startup without an already
+running EPMD.
 
 If your lock file still selects `tflite_beam 1.0.0`, update it and enable the
 LiteRT API before compiling:
