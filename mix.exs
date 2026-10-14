@@ -10,7 +10,7 @@ defmodule TFLiteElixir.MixProject do
       app: @app,
       version: @version,
       dialyzer: dialyzer(),
-      elixir: "~> 1.14",
+      elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       source_url: @github_url,
